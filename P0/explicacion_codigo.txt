@@ -1,0 +1,43 @@
+
+Aquí tienes un resumen del código a modo de esquema:
+
+1. **Estructuras de datos**:
+   - **Lista de comandos**: Se usa para almacenar el histórico de comandos que el usuario introduce.
+     - `Nodo`: Representa un nodo en la lista, que contiene el comando y un puntero al siguiente nodo.
+     - `Lista`: Contiene un puntero al primer nodo (la cabeza de la lista).
+   - **Lista de ficheros abiertos**: Guarda los archivos que se han abierto durante la ejecución del shell.
+     - `Fichero`: Representa un archivo abierto, con su descriptor, nombre, modo y un puntero al siguiente fichero.
+     - `ListaFicheros`: Contiene un puntero al primer fichero abierto.
+
+2. **Funciones principales**:
+   - **`main()`**: 
+     - Inicializa las listas de comandos y ficheros abiertos.
+     - Llama a las funciones para leer la entrada del usuario, procesarla y ejecutar los comandos.
+     - Si el comando es `quit`, se liberan las listas y se sale del programa.
+   
+   - **`imprimirPrompt()`**: Muestra el prompt (`mi_shell> `) en la consola.
+   
+   - **`leerEntrada()`**: Lee la entrada del usuario utilizando `fgets()` y la guarda en una cadena.
+
+   - **`procesarEntrada()`**:
+     - Divide la entrada en trozos (comando y argumentos) con `TrocearCadena()`.
+     - Dependiendo del comando, llama a funciones específicas:
+       - **`Cmd_open()`**: Abre un fichero con los modos indicados y lo añade a la lista de ficheros abiertos.
+       - **`Cmd_close()`**: Cierra un fichero especificado por el descriptor y lo elimina de la lista.
+       - **`Cmd_historic()`**: Muestra el histórico de comandos introducidos.
+       - **`quit` / `exit` / `bye`**: Sale del programa liberando memoria.
+
+3. **Manejo de ficheros**:
+   - **`Cmd_open()`**: Abre un fichero con los modos indicados (`O_RDONLY`, `O_WRONLY`, etc.) y lo añade a la lista de ficheros abiertos.
+   - **`Cmd_close()`**: Cierra un fichero por su descriptor y lo elimina de la lista de ficheros abiertos.
+   - **`ListarFicherosAbiertos()`**: Muestra una lista de todos los archivos abiertos.
+
+4. **Histórico de comandos**:
+   - **`AnadirComando()`**: Añade el comando introducido por el usuario a la lista de comandos.
+   - **`Cmd_historic()`**: Muestra el histórico de comandos en orden inverso (último comando primero).
+
+5. **Liberación de memoria**:
+   - **`LiberarListaComandos()`**: Libera toda la memoria asociada a la lista de comandos.
+   - **`LiberarListaFicheros()`**: Libera toda la memoria de la lista de ficheros abiertos.
+
+Este código crea un shell básico que permite abrir/cerrar archivos y mantener un histórico de los comandos ingresados, liberando correctamente la memoria cuando sea necesario.
