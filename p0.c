@@ -25,11 +25,11 @@ typedef struct {
     int tamano;
 } ListaHistorico;
 
-typedef struct {
+typedef struct Fichero {
     int descriptor;
-    char nombre[MAX_INPUT];
+    char *nombre;
     int modo;
-    struct Fichero *siguiente;
+    struct Fichero *siguiente; // Puntero al siguiente nodo
 } Fichero;
 
 typedef struct {
@@ -233,18 +233,55 @@ void AnadirComando(ListaHistorico *historico, char *comando) {
 
 // Función para el comando "open"
 void Cmd_open(char *tr[], ListaFicheros *listaFicheros) {
+    Fichero *actual = listaFicheros->cabeza;
     if (tr[1] == NULL) {
         // Listar archivos abiertos
         printf("Lista de ficheros abiertos...\n");
         // Código para listar
+        while(actual != NULL){
+            printf("Name: %s, Mode: %d, Descriptor: %d\n", actual->nombre, actual->modo, actual->descriptor);
+            actual = actual->siguiente;
+        }
     } else {
+        // Proceso de apertura de archivo
+        int modo = 0;
+        char *nombreArchivo = tr[1];
+
+        // Mapeo de los modos desde el segundo parámetro del comando
+        if(tr[2] != NULL){
+            if (strcmp(tr[2], "ro") == 0) modo = O_RDONLY;
+            else if (strcmp(tr[2], "wo") == 0) modo = O_WRONLY;
+            else if (strcmp(tr[2], "rw") == 0) modo = O_RDWR;
+            else if (strcmp(tr[2], "cr") == 0) modo = O_CREAT | O_WRONLY;
+            else if (strcmp(tr[2], "ap") == 0) modo = O_APPEND;
+            else if (strcmp(tr[2], "tr") == 0) modo = O_TRUNC | O_WRONLY;
+            else if (strcmp(tr[2], "ex") == 0) modo = O_EXCL | O_CREAT;
+            else {
+                printf("Modo desconocido: %s\n", tr[2]);
+                return;
+            }
+        }
+        else{
+            modo = O_RDONLY; // Modo por defecto
+        }
+
         // Código para abrir un archivo
-        int fd = open(tr[1], O_RDONLY);
+        int fd = open(nombreArchivo, modo);
         if (fd == -1) {
             perror("Error al abrir el archivo");
-        } else {
-            printf("Archivo abierto: %s (descriptor: %d)\n", tr[1], fd);
-            // Añadir a la lista de ficheros abiertos
+        } 
+        else {
+            printf("Archivo abierto: %s (descriptor: %d)\n", nombreArchivo, fd);
+
+            //Creamos un nuevo nodo para la lista de archivos abiertos
+            Fichero *nuevoFichero = (Fichero *)malloc(sizeof(Fichero));
+            nuevoFichero->nombre = strdup(nombreArchivo);
+            nuevoFichero->descriptor = fd;
+            nuevoFichero->modo = modo;
+            nuevoFichero->siguiente = listaFicheros->cabeza;
+
+            // Añadimos el nuevo nodo al inicio de la lista
+            listaFicheros->cabeza = nuevoFichero;   
         }
     }
 }
