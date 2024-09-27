@@ -1,3 +1,10 @@
+/*
+MIEMBROS
+Iván Castro Roel - ivan.castro.roel@udc.es
+Lucas García Boenter - l.garcia-boente@udc.es
+*/
+
+
 // INCLUDE
 #include <stdio.h>
 #include <stdlib.h>
