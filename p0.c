@@ -301,13 +301,34 @@ void Cmd_close(char *tr[], ListaFicheros *listaFicheros) {
     }
     
     int fd = atoi(tr[1]);  // Convertir el argumento a entero
+    Fichero *actual = listaFicheros->cabeza;
+    Fichero *anterior = NULL;
 
+    // Buscar el archivo en la lista
+    while (actual != NULL && actual->descriptor != fd) {
+        anterior = actual;
+        actual = actual->siguiente;
+    }
+
+    if (actual == NULL) {
+        printf("Descriptor %d no encontrado.\n", fd);
+        return;
+    }
+
+    // Cerrar el archivo
     if (close(fd) == -1) {
         perror("Error al cerrar el archivo");
     } else {
         printf("Descriptor %d cerrado.\n", fd);
-        // Eliminar el archivo de la lista de ficheros abiertos
-        // (Implementación para eliminar de la lista de ficheros abiertos)
+
+        // Eliminar el archivo de la lista
+        if (anterior == NULL) {
+            listaFicheros->cabeza = actual->siguiente;
+        } else {
+            anterior->siguiente = actual->siguiente;
+        }
+        free(actual->nombre);
+        free(actual);
     }
 }
 
@@ -325,8 +346,22 @@ void Cmd_dup(char *tr[], ListaFicheros *listaFicheros) {
         perror("Error al duplicar el archivo");
     } else {
         printf("Descriptor %d duplicado. Nuevo descriptor: %d\n", fd, nuevo_fd);
-        // Añadir el nuevo descriptor a la lista de archivos abiertos
-        // (Implementación para añadir a la lista de ficheros abiertos)
+
+        // Buscar el archivo original en la lista
+        Fichero *actual = listaFicheros->cabeza;
+        while (actual != NULL && actual->descriptor != fd) {
+            actual = actual->siguiente;
+        }
+
+        // Añadir el nuevo descriptor a la lista
+        if (actual != NULL) {
+            Fichero *nuevoFichero = (Fichero *)malloc(sizeof(Fichero));
+            nuevoFichero->nombre = strdup(actual->nombre);
+            nuevoFichero->descriptor = nuevo_fd;
+            nuevoFichero->modo = actual->modo;
+            nuevoFichero->siguiente = listaFicheros->cabeza;
+            listaFicheros->cabeza = nuevoFichero;
+        }
     }
 }
 
