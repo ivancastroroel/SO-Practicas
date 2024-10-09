@@ -16,7 +16,8 @@ Lucas García Boenter - l.garcia-boente@udc.es
 #include <sys/utsname.h>
 #include <stdbool.h>
 #include <sys/types.h>
-#include <sys/stat.h> 
+#include <sys/stat.h>
+
 
 // DEFINE
 #define MAX_INPUT 1024
@@ -60,7 +61,10 @@ void Cmd_infosys();
 void Cmd_help(char *tr[]);
 void Cmd_makefile(char *tr[]);
 void Cmd_makedir(char *tr[]);
+void Cmd_listfile(char *tr[]);
+char LetraTF (mode_t m);
 mode_t ConvierteCadenaAModo(const char *permisos);
+char * ConvierteModo (mode_t m, char *permisos);
 
 int main(){
     char entrada[MAX_INPUT];
@@ -174,7 +178,7 @@ void procesarEntrada(char * entrada, ListaHistorico *historico, ListaFicheros *l
 
     //LISTFILE -long -acc slink para ver que campos deben salir con listdir -long (son 8)
     else if(strcmp(trozos[0], "listfile") == 0){
-        //Cmd_listfile(trozos);
+        Cmd_listfile(trozos);
     }
     else {
         printf("\nComando no reconocido\n");
@@ -196,6 +200,20 @@ int TrocearCadena(char * cadena, char * trozos[]) {
     return i;
 }
 
+char LetraTF (mode_t m)
+{
+     switch (m&S_IFMT) { /*and bit a bit con los bits de formato,0170000 */
+        case S_IFSOCK: return 's'; /*socket */
+        case S_IFLNK: return 'l'; /*symbolic link*/
+        case S_IFREG: return '-'; /* fichero normal*/
+        case S_IFBLK: return 'b'; /*block device*/
+        case S_IFDIR: return 'd'; /*directorio */ 
+        case S_IFCHR: return 'c'; /*char device*/
+        case S_IFIFO: return 'p'; /*pipe*/
+        default: return '?'; /*desconocido, no deberia aparecer*/
+     }
+}
+
 mode_t ConvierteCadenaAModo(const char *permisos) {
     mode_t modo = 0;
 
@@ -215,6 +233,27 @@ mode_t ConvierteCadenaAModo(const char *permisos) {
     if (permisos[9] == 'x') modo |= S_IXOTH;  // Ejecución de otros
 
     return modo;
+}
+
+char * ConvierteModo (mode_t m, char *permisos)
+{
+    strcpy (permisos,"---------- ");
+    
+    permisos[0]=LetraTF(m);
+    if (m&S_IRUSR) permisos[1]='r';    /*propietario*/
+    if (m&S_IWUSR) permisos[2]='w';
+    if (m&S_IXUSR) permisos[3]='x';
+    if (m&S_IRGRP) permisos[4]='r';    /*grupo*/
+    if (m&S_IWGRP) permisos[5]='w';
+    if (m&S_IXGRP) permisos[6]='x';
+    if (m&S_IROTH) permisos[7]='r';    /*resto*/
+    if (m&S_IWOTH) permisos[8]='w';
+    if (m&S_IXOTH) permisos[9]='x';
+    if (m&S_ISUID) permisos[3]='s';    /*setuid, setgid y stickybit*/
+    if (m&S_ISGID) permisos[6]='s';
+    if (m&S_ISVTX) permisos[9]='t';
+    
+    return permisos;
 }
 
 
@@ -494,6 +533,7 @@ void Cmd_makefile(char *trozos[]){
 
 //Función para el comando "makedir"
 void Cmd_makedir(char *trozos[]){
+
     int result = 2;
     if (trozos[1] == NULL){
         perror("Falta el nombre del directorio");
@@ -510,5 +550,35 @@ void Cmd_makedir(char *trozos[]){
         perror("Error al crear el archivo");
     } else if(result == 0) {
         printf("Archivo creado con éxito \n");
+    }
+}
+
+void Cmd_listfile(char *trozos[]){
+    struct stat fileStat;
+    char *permisos[11];
+
+    // Obtenemos la información del archivo
+    if (stat(trozos[2], &fileStat) < 0) {
+        if(stat(trozos[3], &fileStat) < 0){
+            perror("Error al obtener información del archivo");
+            return;
+        }
+        
+    }
+
+    if(trozos[3] == NULL){
+        printf("%ld", fileStat.st_size);
+        printf("%s", trozos[2]);
+    } else{
+        if(strcmp(trozos[2], "-long") == 0){
+            printf("%s", fileStat.st_mtimespec);
+            printf(" %d", fileStat.st_nlink);
+            printf(" %ld", fileStat.st_size);
+            printf(" %s", fileStat.st_uid);
+            printf(" ????");
+            printf(" %s", ConvierteModo(fileStat.st_mode, permisos));
+            printf(" %d", fileStat.st_ino);
+            printf(" %s", trozos[3]);
+        }
     }
 }
