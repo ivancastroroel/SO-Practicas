@@ -15,6 +15,8 @@ Lucas García Boenter - l.garcia-boente@udc.es
 #include <time.h>
 #include <sys/utsname.h>
 #include <stdbool.h>
+#include <sys/types.h>
+#include <sys/stat.h> 
 
 // DEFINE
 #define MAX_INPUT 1024
@@ -76,11 +78,13 @@ int main(){
 }
 
 void imprimirPrompt(){
-    printf("mi_shell> ");
+    printf("mi_shell-> ");
 }
 
-void leerEntrada(char * entrada){
-    fgets(entrada, MAX_INPUT, stdin);
+void leerEntrada(char *entrada) {
+    if (fgets(entrada, MAX_INPUT, stdin) != NULL) {
+        entrada[strcspn(entrada, "\n")] = 0; // Eliminamos el salto de línea
+    }
 }
 
 void procesarEntrada(char * entrada, ListaHistorico *historico, ListaFicheros *listaFicheros){
@@ -164,11 +168,14 @@ void procesarEntrada(char * entrada, ListaHistorico *historico, ListaFicheros *l
         Cmd_makefile(trozos);
     }
     //MAKEDIR
-    else if(trcmp(trozos[0], "makedir") == 0){
+    else if(strcmp(trozos[0], "makedir") == 0){
         Cmd_makedir(trozos);
     }
 
-    //listdir -long -acc slink para ver que campos deben salir con listdir -long (son 8)
+    //LISTFILE -long -acc slink para ver que campos deben salir con listdir -long (son 8)
+    else if(strcmp(trozos[0], "listfile") == 0){
+        //Cmd_listfile(trozos);
+    }
     else {
         printf("\nComando no reconocido\n");
     }
@@ -211,8 +218,7 @@ mode_t ConvierteCadenaAModo(const char *permisos) {
 }
 
 
-// FUNCIONES
-
+// ----- FUNCIONES -----
 // Función para el comando "date"
 void Cmd_date(char *tr[]) {
     time_t t;
@@ -465,30 +471,44 @@ void Cmd_help(char *tr[]) {
     }
 }
 
+//Función para el comando "makefile"
 void Cmd_makefile(char *trozos[]){
+    int result =  2;
     if (trozos[1] == NULL){
-            perror("Falta el nombre del archivo");
-        }
-        else if(trozos[2] == NULL){
-            creat(trozos[1], S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IWOTH);
-        }
-        else{
-            mode_t mode = ConvierteCadenaAModo(trozos[2]);
-        
-            int fd = creat (trozos[1], mode);
-    
-            // Comprobar si se creó con éxito
-            if (fd == -1) {
-                perror("Error al crear el archivo");
-            } else {
-                printf("Archivo creado con éxito \n");
-            }
-            
-            // Cerrar el descriptor de archivo
-            close(fd);
-        }
+        perror("Falta el nombre del archivo");
+    }
+    else if(trozos[2] == NULL && trozos[1] != NULL){
+        result = creat(trozos[1], S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR);
+    }
+    else{
+        mode_t mode = ConvierteCadenaAModo(trozos[2]);
+        result = creat(trozos[1], mode);
+    }
+
+    if (result == -1) {
+        perror("Error al crear el archivo");
+    } else{
+        printf("Archivo creado con éxito \n");
+    }
 }
 
+//Función para el comando "makedir"
 void Cmd_makedir(char *trozos[]){
-    
+    int result = 2;
+    if (trozos[1] == NULL){
+        perror("Falta el nombre del directorio");
+    }
+    else if(trozos[2] == NULL && trozos[1] != NULL){
+        result = mkdir(trozos[1], 0755);
+    }
+    else{
+        mode_t mode = ConvierteCadenaAModo(trozos[2]);
+        result = mkdir(trozos[1], mode);
+    }
+
+    if (result == -1) {
+        perror("Error al crear el archivo");
+    } else if(result == 0) {
+        printf("Archivo creado con éxito \n");
+    }
 }
