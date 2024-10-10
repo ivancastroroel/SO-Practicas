@@ -17,6 +17,9 @@ Lucas García Boenter - l.garcia-boente@udc.es
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <pwd.h>
+#include <grp.h>
 
 
 // DEFINE
@@ -62,6 +65,7 @@ void Cmd_help(char *tr[]);
 void Cmd_makefile(char *tr[]);
 void Cmd_makedir(char *tr[]);
 void Cmd_listfile(char *tr[]);
+void Cmd_listdir(char *tr[]);
 char LetraTF (mode_t m);
 mode_t ConvierteCadenaAModo(const char *permisos);
 char * ConvierteModo (mode_t m, char *permisos);
@@ -180,9 +184,24 @@ void procesarEntrada(char * entrada, ListaHistorico *historico, ListaFicheros *l
     else if(strcmp(trozos[0], "listfile") == 0){
         Cmd_listfile(trozos);
     }
+    //CWD
+    else if(strcmp(trozos[0], "cwd") == 0){
+        char buf[1024];
+        if (getcwd(buf, sizeof(buf)) != NULL) {
+            printf("Directorio actual: %s\n", buf);
+        } else {
+            perror("Error obteniendo el directorio de trabajo actual");
+        }
+    }
+    //LISTDIR
+    else if(strcmp(trozos[0], "listdir") == 0){
+        Cmd_listdir(trozos);
+    }
+
     else {
         printf("\nComando no reconocido\n");
     }
+    
 }
 
 
@@ -553,32 +572,97 @@ void Cmd_makedir(char *trozos[]){
     }
 }
 
+//Función para el comando "listfile"
 void Cmd_listfile(char *trozos[]){
     struct stat fileStat;
-    char *permisos[11];
+    char permisos[11];
+    char timebuf[100]; // Para almacenar la fecha y hora
+    struct tm *tm_info;
+
+    // Verificamos si se ha pasado el nombre del archivo
+    if (trozos[2] == NULL && trozos[1] == NULL) {
+        printf("Error: No se ha proporcionado el nombre del archivo.\n");
+        return;
+    }
+
+    // Verificamos si se ha pasado el nombre del archivo
+    char *filename = (trozos[2] != NULL) ? trozos[2] : trozos[1];
+    
 
     // Obtenemos la información del archivo
-    if (stat(trozos[2], &fileStat) < 0) {
-        if(stat(trozos[3], &fileStat) < 0){
-            perror("Error al obtener información del archivo");
+    if (stat(filename, &fileStat) == -1) {
+        perror("Error al obtener información del archivo");
+        return;
+    }else{
+        if(trozos[2] == NULL){
+            printf("%jd\t", (intmax_t)fileStat.st_size);
+            printf("%s\n", trozos[1]);
+        }else {
+            if(strcmp(trozos[1], "-long") == 0){
+                // 1. Fecha de modificación
+                tm_info = localtime(&fileStat.st_mtime);
+                if (tm_info == NULL) {
+                    perror("Error al convertir la hora");
+                    return;
+                }
+                strftime(timebuf, sizeof(timebuf), "%Y/%m/%d-%H:%M", tm_info);
+                printf("%s\t", timebuf);
+
+                // 2. Número de enlaces (st_nlink)
+                printf("%hu\t", fileStat.st_nlink);  // nlink_t es unsigned short
+
+                // 3. Tamaño del archivo (st_size)
+                printf("%lld\t", (long long)fileStat.st_size);  // off_t es long long
+
+                // 4. Propietario (st_uid)
+                struct passwd *pw = getpwuid(fileStat.st_uid);
+                if (pw) {
+                    printf("%s\t", pw->pw_name);
+                } else {
+                    printf("%d\t", fileStat.st_uid);
+                }
+
+                // 5. Grupo (st_gid)
+                struct group *gr = getgrgid(fileStat.st_gid);
+                if (gr) {
+                    printf("%s\t", gr->gr_name);
+                } else {
+                    printf("%d\t", fileStat.st_gid);
+                }
+
+                // 6. Permisos (st_mode)
+                printf("%s\t", ConvierteModo(fileStat.st_mode, permisos));
+
+                // 7. Número de inodo (st_ino)
+                printf("%lu\t", (unsigned long)fileStat.st_ino);
+
+                // 8. Nombre del archivo
+                printf("%s\n", filename);
+            }
+        }
+    }
+}
+
+//Función para el comando "listdir"
+void Cmd_listdir(char *trozos[]){
+    if(trozos[1]==NULL){
+            perror("No hay directorio");
+        }
+        struct dirent *entradadir;  // Estructura para almacenar la entrada del directorio
+        DIR *directorio = opendir(trozos[1]);  // Abre el directorio
+
+        if (directorio == NULL) {
+            perror("Error al abrir el directorio");  // Imprime un mensaje de error si no se puede abrir
             return;
         }
-        
-    }
 
-    if(trozos[3] == NULL){
-        printf("%ld", fileStat.st_size);
-        printf("%s", trozos[2]);
-    } else{
-        if(strcmp(trozos[2], "-long") == 0){
-            printf("%s", fileStat.st_mtimespec);
-            printf(" %d", fileStat.st_nlink);
-            printf(" %ld", fileStat.st_size);
-            printf(" %s", fileStat.st_uid);
-            printf(" ????");
-            printf(" %s", ConvierteModo(fileStat.st_mode, permisos));
-            printf(" %d", fileStat.st_ino);
-            printf(" %s", trozos[3]);
+        // Lee cada entrada en el directorio
+        while ((entradadir = readdir(directorio)) != NULL) {
+            // Ignora las entradas "." y ".."
+            if (strcmp(entradadir->d_name, ".") != 0 && strcmp(entradadir->d_name, "..") != 0) {
+                printf("%s\n", entradadir->d_name);  // Imprime el nombre de la entrada
+            }
         }
-    }
+
+        closedir(directorio);  // Cierra el directorio después de leerlo
 }
