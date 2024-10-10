@@ -9,6 +9,7 @@ Lucas García Boenter - l.garcia-boente@udc.es
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -81,6 +82,8 @@ int main(){
         AnadirComando(&historico, entrada);  // Añadir el comando al histórico
         procesarEntrada(entrada, &historico, &listaFicheros);
     }
+
+    liberar_memoria(&historico, &listaFicheros);
 
     return 0;
 }
@@ -273,6 +276,25 @@ char * ConvierteModo (mode_t m, char *permisos)
     if (m&S_ISVTX) permisos[9]='t';
     
     return permisos;
+}
+
+void liberar_memoria(ListaHistorico *historico, ListaFicheros *listaFicheros) {
+    // Liberar memoria del histórico
+    Nodo *temp;
+    while (historico->cabeza != NULL) {
+        temp = historico->cabeza;
+        historico->cabeza = historico->cabeza->siguiente;
+        free(temp);
+    }
+
+    // Liberar memoria de la lista de ficheros
+    Fichero *tempFichero;
+    while (listaFicheros->cabeza != NULL) {
+        tempFichero = listaFicheros->cabeza;
+        listaFicheros->cabeza = listaFicheros->cabeza->siguiente;
+        free(tempFichero->nombre);
+        free(tempFichero);
+    }
 }
 
 
