@@ -83,7 +83,7 @@ int main(){
         procesarEntrada(entrada, &historico, &listaFicheros);
     }
 
-    liberar_memoria(&historico, &listaFicheros);
+    //liberar_memoria(&historico, &listaFicheros);
 
     return 0;
 }
@@ -278,24 +278,7 @@ char * ConvierteModo (mode_t m, char *permisos)
     return permisos;
 }
 
-void liberar_memoria(ListaHistorico *historico, ListaFicheros *listaFicheros) {
-    // Liberar memoria del histórico
-    Nodo *temp;
-    while (historico->cabeza != NULL) {
-        temp = historico->cabeza;
-        historico->cabeza = historico->cabeza->siguiente;
-        free(temp);
-    }
 
-    // Liberar memoria de la lista de ficheros
-    Fichero *tempFichero;
-    while (listaFicheros->cabeza != NULL) {
-        tempFichero = listaFicheros->cabeza;
-        listaFicheros->cabeza = listaFicheros->cabeza->siguiente;
-        free(tempFichero->nombre);
-        free(tempFichero);
-    }
-}
 
 
 // ----- FUNCIONES -----
@@ -616,10 +599,13 @@ void Cmd_listfile(char *trozos[]){
         perror("Error al obtener información del archivo");
         return;
     }else{
-        if(trozos[2] == NULL){
-            printf("%jd\t", (intmax_t)fileStat.st_size);
+        if(trozos[2] == NULL){ //si no pasamos ninguna opción entonces muestra tamaño y nombre
+            // 1. Número de inodo (st_ino)
+            printf("%lu\t", (unsigned long)fileStat.st_ino);
+            // 2. Nombre del archivo
             printf("%s\n", trozos[1]);
         }else {
+            // -long muestra -> 2024/10/02-12:12   1 (26211315)     ivan   ?????? -rwxr-xr-x   101960 shell-macos.out
             if(strcmp(trozos[1], "-long") == 0){
                 // 1. Fecha de modificación
                 tm_info = localtime(&fileStat.st_mtime);
@@ -660,6 +646,28 @@ void Cmd_listfile(char *trozos[]){
 
                 // 8. Nombre del archivo
                 printf("%s\n", filename);
+            }
+            // -acc muestra -> 101960  2024/10/09-20:18 shell-macos.out
+            else if(strcmp(trozos[1], "-acc") == 0){
+                // 1. Número de inodo (st_ino)
+                printf("%lu\t", (unsigned long)fileStat.st_ino);
+                // 2. Fecha de modificación
+                tm_info = localtime(&fileStat.st_mtime);
+                if (tm_info == NULL) {
+                    perror("Error al convertir la hora");
+                    return;
+                }
+                strftime(timebuf, sizeof(timebuf), "%Y/%m/%d-%H:%M", tm_info);
+                printf("%s\t", timebuf);
+                // 3. Nombre del archivo
+                printf("%s\n", filename);
+            }
+            // -link muestra -> 101960  shell-macos.out
+            else if(strcmp(trozos[1], "-link") == 0){
+                // 1. Número de inodo (st_ino)
+                printf("%lu\t", (unsigned long)fileStat.st_ino);
+                // 2. Nombre del archivo
+                printf("%s\n", trozos[2]);
             }
         }
     }
