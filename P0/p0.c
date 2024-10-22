@@ -1,3 +1,11 @@
+/*
+MIEMBROS
+Iván Castro Roel - ivan.castro.roel@udc.es
+Lucas García Boenter - l.garcia-boente@udc.es
+*/
+
+
+// INCLUDE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,159 +14,168 @@
 #include <errno.h>
 #include <time.h>
 #include <sys/utsname.h>
+#include <stdbool.h>
 
-// Definiciones para la longitud de comandos y el máximo de trozos
+// DEFINE
 #define MAX_INPUT 1024
-#define MAX_TROZOS 128
-#define MAXNAME 256
+#define MAX_TROZOS 10
+#define MAX_HISTORIC 100
 
-// Estructura para la lista de comandos
+// Estructuras para el histórico y ficheros
 typedef struct Nodo {
-    char *comando;
+    char comando[MAX_INPUT];
     struct Nodo *siguiente;
 } Nodo;
 
-typedef struct Lista {
+typedef struct {
     Nodo *cabeza;
-} Lista;
+    int tamano;
+} ListaHistorico;
 
-// Estructura para la lista de ficheros abiertos
 typedef struct Fichero {
     int descriptor;
     char *nombre;
     int modo;
-    struct Fichero *siguiente;
+    struct Fichero *siguiente; // Puntero al siguiente nodo
 } Fichero;
 
-typedef struct ListaFicheros {
+typedef struct {
     Fichero *cabeza;
 } ListaFicheros;
 
-// Declaraciones de funciones
+// Declaración de funciones
 void imprimirPrompt();
 void leerEntrada(char *entrada);
-void procesarEntrada(char *entrada, Lista *listaComandos, ListaFicheros *listaFicheros);
-int TrocearCadena(char *cadena, char *trozos[]);
-void AnadirComando(Lista *lista, char *comando);
+void procesarEntrada(char *entrada, ListaHistorico *historico, ListaFicheros *listaFicheros);
+int TrocearCadena(char * entrada, char * trozos[]);
+void Cmd_date(char *tr[]);
+void Cmd_historic(char *tr[], ListaHistorico *historico);
+void AnadirComando(ListaHistorico *historico, char *comando);
 void Cmd_open(char *tr[], ListaFicheros *listaFicheros);
 void Cmd_close(char *tr[], ListaFicheros *listaFicheros);
-void Cmd_historic(Lista *lista);
-void Cmd_pid();
-void Cmd_ppid();
-void Cmd_date(char *tr[]);
+void Cmd_dup(char *tr[], ListaFicheros *listaFicheros);
 void Cmd_infosys();
-void AnadirAFicherosAbiertos(ListaFicheros *lista, int descriptor, char *nombre, int modo);
-void EliminarDeFicherosAbiertos(ListaFicheros *lista, int descriptor);
-void ListarFicherosAbiertos(ListaFicheros *lista);
-void LiberarListaComandos(Lista *lista);
-void LiberarListaFicheros(ListaFicheros *lista);
+void Cmd_help(char *tr[]);
 
-// Función principal
-int main() {
+int main(){
     char entrada[MAX_INPUT];
-    Lista listaComandos = {NULL};
+    ListaHistorico historico = {NULL, 0};
     ListaFicheros listaFicheros = {NULL};
 
-    while (1) {
+    while (1){
         imprimirPrompt();
         leerEntrada(entrada);
-        if (strlen(entrada) > 0) {
-            AnadirComando(&listaComandos, entrada);
-            procesarEntrada(entrada, &listaComandos, &listaFicheros);
-        }
+        AnadirComando(&historico, entrada);  // Añadir el comando al histórico
+        procesarEntrada(entrada, &historico, &listaFicheros);
     }
-
-    // Liberar la memoria antes de salir
-    LiberarListaComandos(&listaComandos);
-    LiberarListaFicheros(&listaFicheros);
 
     return 0;
 }
 
-// Función para imprimir el prompt
-void imprimirPrompt() {
+void imprimirPrompt(){
     printf("mi_shell> ");
-    fflush(stdout);
 }
 
-// Función para leer la entrada del usuario
-void leerEntrada(char *entrada) {
-    if (fgets(entrada, MAX_INPUT, stdin) == NULL) {
-        perror("Error al leer entrada");
-        exit(EXIT_FAILURE);
-    }
+void leerEntrada(char * entrada){
+    fgets(entrada, MAX_INPUT, stdin);
 }
 
-// Función para procesar la entrada del usuario
-void procesarEntrada(char *entrada, Lista *listaComandos, ListaFicheros *listaFicheros) {
+void procesarEntrada(char * entrada, ListaHistorico *historico, ListaFicheros *listaFicheros){
     char *trozos[MAX_TROZOS];
-    int numTrozos = TrocearCadena(entrada, trozos);
+    TrocearCadena(entrada, trozos);
 
-    if (numTrozos == 0) return;
-
-    if (strcmp(trozos[0], "open") == 0) {
-        Cmd_open(trozos + 1, listaFicheros);
-    } else if (strcmp(trozos[0], "close") == 0) {
-        Cmd_close(trozos + 1, listaFicheros);
-    } else if (strcmp(trozos[0], "historic") == 0) {
-        Cmd_historic(listaComandos);
-    } else if (strcmp(trozos[0], "pid") == 0) {
-        Cmd_pid();
-    } else if (strcmp(trozos[0], "ppid") == 0) {
-        Cmd_ppid();
-    } else if (strcmp(trozos[0], "date") == 0) {
-        Cmd_date(trozos + 1);
-    } else if (strcmp(trozos[0], "infosys") == 0) {
+    // AUTHORS
+    if (strcmp(trozos[0], "authors") == 0) {
+        if (trozos[1] == NULL) {
+            printf("Ivan - ivan.castro.roel\n");
+            printf("Lucas - l.garcia-boenter\n");
+        }
+        else if (strcmp(trozos[1], "-l") == 0) {
+            printf("ivan.castro.roel\n");
+            printf("l.garcia-boenter\n");
+        }
+        else if (strcmp(trozos[1], "-n") == 0) {
+            printf("Ivan\n");
+            printf("Lucas\n");
+        }
+    }
+    // PID
+    else if (strcmp(trozos[0], "pid") == 0) {
+        printf("%d\n", getpid());
+    }
+    // PPID
+    else if (strcmp(trozos[0], "ppid") == 0) {
+        printf("%d\n", getppid());
+    }
+    // CD
+    else if (strcmp(trozos[0], "cd") == 0) {
+        char buf[1024];
+        if (trozos[1] == NULL) {
+            getcwd(buf, sizeof(buf));
+            printf("Ruta actual:%s\n", buf);
+        }
+        else {
+            if (chdir(trozos[1]) != 0) {
+                perror("Error al cambiar el directorio");
+            } else {
+                getcwd(buf, sizeof(buf));
+                printf("Directorio cambiado a: %s\n", buf);
+            }
+        }
+    }
+    // DATE
+    else if (strcmp(trozos[0], "date") == 0) {
+        Cmd_date(trozos);
+    }
+    // HISTORIC
+    else if (strcmp(trozos[0], "historic") == 0) {
+        Cmd_historic(trozos, historico);
+    }
+    // OPEN
+    else if (strcmp(trozos[0], "open") == 0) {
+        Cmd_open(trozos, listaFicheros);
+    }
+    // CLOSE
+    else if (strcmp(trozos[0], "close") == 0) {
+        Cmd_close(trozos, listaFicheros);
+    }
+    // DUP
+    else if (strcmp(trozos[0], "dup") == 0) {
+        Cmd_dup(trozos, listaFicheros);
+    }
+    // INFOSYS
+    else if (strcmp(trozos[0], "infosys") == 0) {
         Cmd_infosys();
-    } else if (strcmp(trozos[0], "quit") == 0 || strcmp(trozos[0], "exit") == 0 || strcmp(trozos[0], "bye") == 0) {
-        LiberarListaComandos(listaComandos);
-        LiberarListaFicheros(listaFicheros);
+    }
+    // HELP
+    else if (strcmp(trozos[0], "help") == 0) {
+        Cmd_help(trozos);
+    }
+    // QUIT/EXIT/BYE
+    else if (strcmp(trozos[0], "quit") == 0 || strcmp(trozos[0], "exit") == 0 || strcmp(trozos[0], "bye") == 0) {
+        printf("Saliendo de la shell...\n");
         exit(0);
-    } else {
-        printf("Comando no reconocido: %s\n", trozos[0]);
+    }
+    else {
+        printf("\nComando no reconocido\n");
     }
 }
 
-// Función para dividir la cadena en trozos
-int TrocearCadena(char *cadena, char *trozos[]) {
-    int i = 0;
+int TrocearCadena(char * cadena, char * trozos[]) {
+    int i = 1;
+
     if ((trozos[0] = strtok(cadena, " \n\t")) == NULL)
         return 0;
 
-    while ((trozos[++i] = strtok(NULL, " \n\t")) != NULL);
+    while ((trozos[i] = strtok(NULL, " \n\t")) != NULL)
+        i++;
+
     return i;
 }
 
-// Función para añadir un comando al histórico
-void AnadirComando(Lista *lista, char *comando) {
-    Nodo *nuevo = (Nodo *)malloc(sizeof(Nodo));
-    nuevo->comando = strdup(comando);
-    nuevo->siguiente = lista->cabeza;
-    lista->cabeza = nuevo;
-}
+// FUNCIONES EXTRA
 
-// Función para listar el histórico de comandos
-void Cmd_historic(Lista *lista) {
-    Nodo *actual = lista->cabeza;
-    int contador = 0;
-
-    while (actual != NULL) {
-        printf("%d: %s\n", contador++, actual->comando);
-        actual = actual->siguiente;
-    }
-}
-
-// Función para obtener el PID del proceso
-void Cmd_pid() {
-    printf("PID: %d\n", getpid());
-}
-
-// Función para obtener el PPID del proceso
-void Cmd_ppid() {
-    printf("PPID: %d\n", getppid());
-}
-
-// Función para obtener la fecha y hora actual
+// Función para el comando "date"
 void Cmd_date(char *tr[]) {
     time_t t;
     struct tm *tm_info;
@@ -167,13 +184,13 @@ void Cmd_date(char *tr[]) {
     time(&t);
     tm_info = localtime(&t);
 
-    if (tr[0] == NULL) {
+    if (tr[1] == NULL) {
         strftime(buffer, 80, "%d/%m/%Y %H:%M:%S", tm_info);
         printf("Fecha y hora actual: %s\n", buffer);
-    } else if (strcmp(tr[0], "-d") == 0) {
+    } else if (strcmp(tr[1], "-d") == 0) {
         strftime(buffer, 80, "%d/%m/%Y", tm_info);
         printf("Fecha actual: %s\n", buffer);
-    } else if (strcmp(tr[0], "-t") == 0) {
+    } else if (strcmp(tr[1], "-t") == 0) {
         strftime(buffer, 80, "%H:%M:%S", tm_info);
         printf("Hora actual: %s\n", buffer);
     } else {
@@ -181,130 +198,231 @@ void Cmd_date(char *tr[]) {
     }
 }
 
-// Función para imprimir información del sistema
-void Cmd_infosys() {
-    struct utsname unameData;
-    if (uname(&unameData) < 0) {
-        perror("Error al obtener información del sistema");
-        return;
+// Función para manejar el histórico de comandos
+void Cmd_historic(char *tr[], ListaHistorico *historico) {
+    Nodo *actual = historico->cabeza;
+    int contador = 0;
+
+    if (tr[1] == NULL) {  // Mostrar todo el histórico
+        while (actual != NULL) {
+            printf("%d: %s", contador++, actual->comando);
+            actual = actual->siguiente;
+        }
+    } else if (tr[1][0] == '-') {  // Mostrar últimos N comandos
+        int N = atoi(tr[1] + 1); 
+        actual = historico->cabeza;
+        while (actual != NULL && contador < N) {
+            printf("%d: %s", contador++, actual->comando);
+            actual = actual->siguiente;
+        }
+    } else {  // Repetir comando N
+        int N = atoi(tr[1]);
+        actual = historico->cabeza;
+        while (actual != NULL && contador < N) {
+            actual = actual->siguiente;
+            contador++;
+        }
+        if (actual != NULL) {
+            printf("Repitiendo comando: %s\n", actual->comando);
+            procesarEntrada(actual->comando, historico, NULL);
+        }
     }
-    printf("Sistema operativo: %s\n", unameData.sysname);
-    printf("Nombre del nodo: %s\n", unameData.nodename);
-    printf("Versión del sistema operativo: %s\n", unameData.release);
-    printf("Versión del kernel: %s\n", unameData.version);
-    printf("Arquitectura del hardware: %s\n", unameData.machine);
 }
 
-// Función para abrir un archivo y añadirlo a la lista de archivos abiertos
+// Función para añadir un comando al histórico
+void AnadirComando(ListaHistorico *historico, char *comando) {
+    Nodo *nuevo = (Nodo *)malloc(sizeof(Nodo));
+    strcpy(nuevo->comando, comando);
+    nuevo->siguiente = historico->cabeza;
+    historico->cabeza = nuevo;
+    historico->tamano++;
+}
+
+// Función para el comando "open"
 void Cmd_open(char *tr[], ListaFicheros *listaFicheros) {
-    int i, df, mode = 0;
+    Fichero *actual = listaFicheros->cabeza;
+    if (tr[1] == NULL) {
+        // Listar archivos abiertos
+        printf("Lista de ficheros abiertos...\n");
+        // Código para listar
+        while(actual != NULL){
+            printf("Name: %s, Mode: %d, Descriptor: %d\n", actual->nombre, actual->modo, actual->descriptor);
+            actual = actual->siguiente;
+        }
+    } else {
+        // Proceso de apertura de archivo
+        int modo = 0;
+        char *nombreArchivo = tr[1];
 
-    if (tr[0] == NULL) {
-        ListarFicherosAbiertos(listaFicheros);
-        return;
-    }
+        // Mapeo de los modos desde el segundo parámetro del comando
+        if(tr[2] != NULL){
+            if (strcmp(tr[2], "ro") == 0) modo = O_RDONLY;
+            else if (strcmp(tr[2], "wo") == 0) modo = O_WRONLY;
+            else if (strcmp(tr[2], "rw") == 0) modo = O_RDWR;
+            else if (strcmp(tr[2], "cr") == 0) modo = O_CREAT | O_WRONLY;
+            else if (strcmp(tr[2], "ap") == 0) modo = O_APPEND;
+            else if (strcmp(tr[2], "tr") == 0) modo = O_TRUNC | O_WRONLY;
+            else if (strcmp(tr[2], "ex") == 0) modo = O_EXCL | O_CREAT;
+            else {
+                printf("Modo desconocido: %s\n", tr[2]);
+                return;
+            }
+        }
+        else{
+            modo = O_RDONLY; // Modo por defecto
+        }
 
-    for (i = 1; tr[i] != NULL; i++) {
-        if (!strcmp(tr[i], "cr")) mode |= O_CREAT;
-        else if (!strcmp(tr[i], "ex")) mode |= O_EXCL;
-        else if (!strcmp(tr[i], "ro")) mode |= O_RDONLY;
-        else if (!strcmp(tr[i], "wo")) mode |= O_WRONLY;
-                else if (!strcmp(tr[i], "rw")) mode |= O_RDWR;
-        else if (!strcmp(tr[i], "ap")) mode |= O_APPEND;
-        else if (!strcmp(tr[i], "tr")) mode |= O_TRUNC;
-        else break;
-    }
+        // Código para abrir un archivo
+        int fd = open(nombreArchivo, modo);
+        if (fd == -1) {
+            perror("Error al abrir el archivo");
+        } 
+        else {
+            printf("Archivo abierto: %s (descriptor: %d)\n", nombreArchivo, fd);
 
-    if ((df = open(tr[0], mode, 0666)) == -1) // Cambié el modo de permisos a 0666
-        perror("Imposible abrir fichero");
-    else {
-        AnadirAFicherosAbiertos(listaFicheros, df, tr[0], mode);
-        printf("Añadido a la tabla de ficheros abiertos: %s (modo: %d)\n", tr[0], mode);
+            //Creamos un nuevo nodo para la lista de archivos abiertos
+            Fichero *nuevoFichero = (Fichero *)malloc(sizeof(Fichero));
+            nuevoFichero->nombre = strdup(nombreArchivo);
+            nuevoFichero->descriptor = fd;
+            nuevoFichero->modo = modo;
+            nuevoFichero->siguiente = listaFicheros->cabeza;
+
+            // Añadimos el nuevo nodo al inicio de la lista
+            listaFicheros->cabeza = nuevoFichero;   
+        }
     }
 }
 
-// Función para cerrar un archivo y eliminarlo de la lista de archivos abiertos
+// Función para el comando "close"
 void Cmd_close(char *tr[], ListaFicheros *listaFicheros) {
-    int df;
-
-    if (tr[0] == NULL || (df = atoi(tr[0])) < 0) {
-        ListarFicherosAbiertos(listaFicheros);
+    if (tr[1] == NULL) {
+        printf("Debe especificar un descriptor de fichero.\n");
         return;
     }
-
-    if (close(df) == -1)
-        perror("Imposible cerrar descriptor");
-    else {
-        EliminarDeFicherosAbiertos(listaFicheros, df);
-        printf("Cerrado y eliminado de la lista de ficheros abiertos: descriptor %d\n", df);
-    }
-}
-
-// Función para añadir un archivo a la lista de archivos abiertos
-void AnadirAFicherosAbiertos(ListaFicheros *lista, int descriptor, char *nombre, int modo) {
-    Fichero *nuevo = (Fichero *)malloc(sizeof(Fichero));
-    nuevo->descriptor = descriptor;
-    nuevo->nombre = strdup(nombre);
-    nuevo->modo = modo;
-    nuevo->siguiente = lista->cabeza;
-    lista->cabeza = nuevo;
-}
-
-// Función para eliminar un archivo de la lista de archivos abiertos
-void EliminarDeFicherosAbiertos(ListaFicheros *lista, int descriptor) {
-    Fichero *actual = lista->cabeza;
+    
+    int fd = atoi(tr[1]);  // Convertir el argumento a entero
+    Fichero *actual = listaFicheros->cabeza;
     Fichero *anterior = NULL;
 
-    while (actual != NULL) {
-        if (actual->descriptor == descriptor) {
-            if (anterior == NULL)
-                lista->cabeza = actual->siguiente;
-            else
-                anterior->siguiente = actual->siguiente;
-
-            free(actual->nombre);
-            free(actual);
-            return;
-        }
+    // Buscar el archivo en la lista
+    while (actual != NULL && actual->descriptor != fd) {
         anterior = actual;
         actual = actual->siguiente;
     }
 
-    printf("Descriptor no encontrado: %d\n", descriptor);
-}
-
-// Función para listar los archivos abiertos
-void ListarFicherosAbiertos(ListaFicheros *lista) {
-    Fichero *actual = lista->cabeza;
-
-    while (actual != NULL) {
-        printf("Descriptor: %d, Nombre: %s, Modo: %d\n", actual->descriptor, actual->nombre, actual->modo);
-        actual = actual->siguiente;
+    if (actual == NULL) {
+        printf("Descriptor %d no encontrado.\n", fd);
+        return;
     }
-}
 
-// Función para liberar la lista de comandos
-void LiberarListaComandos(Lista *lista) {
-    Nodo *actual = lista->cabeza;
-    Nodo *siguiente;
+    // Cerrar el archivo
+    if (close(fd) == -1) {
+        perror("Error al cerrar el archivo");
+    } else {
+        printf("Descriptor %d cerrado.\n", fd);
 
-    while (actual != NULL) {
-        siguiente = actual->siguiente;
-        free(actual->comando);
-        free(actual);
-        actual = siguiente;
-    }
-}
-
-// Función para liberar la lista de ficheros abiertos
-void LiberarListaFicheros(ListaFicheros *lista) {
-    Fichero *actual = lista->cabeza;
-    Fichero *siguiente;
-
-    while (actual != NULL) {
-        siguiente = actual->siguiente;
+        // Eliminar el archivo de la lista
+        if (anterior == NULL) {
+            listaFicheros->cabeza = actual->siguiente;
+        } else {
+            anterior->siguiente = actual->siguiente;
+        }
         free(actual->nombre);
         free(actual);
-        actual = siguiente;
+    }
+}
+
+// Función para el comando "dup"
+void Cmd_dup(char *tr[], ListaFicheros *listaFicheros) {
+    if (tr[1] == NULL) {
+        printf("Debe especificar un descriptor de fichero.\n");
+        return;
+    }
+    
+    int fd = atoi(tr[1]);  // Convertir el argumento a entero
+    int nuevo_fd = dup(fd);  // Duplicar el descriptor de archivo
+
+    if (nuevo_fd == -1) {
+        perror("Error al duplicar el archivo");
+    } else {
+        printf("Descriptor %d duplicado. Nuevo descriptor: %d\n", fd, nuevo_fd);
+
+        // Buscar el archivo original en la lista
+        Fichero *actual = listaFicheros->cabeza;
+        while (actual != NULL && actual->descriptor != fd) {
+            actual = actual->siguiente;
+        }
+
+        // Añadir el nuevo descriptor a la lista
+        if (actual != NULL) {
+            Fichero *nuevoFichero = (Fichero *)malloc(sizeof(Fichero));
+            nuevoFichero->nombre = strdup(actual->nombre);
+            nuevoFichero->descriptor = nuevo_fd;
+            nuevoFichero->modo = actual->modo;
+            nuevoFichero->siguiente = listaFicheros->cabeza;
+            listaFicheros->cabeza = nuevoFichero;
+        }
+    }
+}
+
+// Función para el comando "infosys"
+void Cmd_infosys() {
+    struct utsname info_sistema;
+    
+    if (uname(&info_sistema) == -1) {
+        perror("Error al obtener la información del sistema");
+    } else {
+        printf("Sistema: %s\n", info_sistema.sysname);
+        printf("Nodo: %s\n", info_sistema.nodename);
+        printf("Release: %s\n", info_sistema.release);
+        printf("Versión: %s\n", info_sistema.version);
+        printf("Máquina: %s\n", info_sistema.machine);
+    }
+}
+
+// Función para el comando "help"
+void Cmd_help(char *tr[]) {
+    if (tr[1] == NULL) {
+        printf("Comandos disponibles:\n");
+        printf("  authors\n");
+        printf("  cd\n");
+        printf("  close\n");
+        printf("  date\n");
+        printf("  dup\n");
+        printf("  help\n");
+        printf("  historic\n");
+        printf("  infosys\n");
+        printf("  open\n");
+        printf("  pid\n");
+        printf("  ppid\n");
+        printf("  quit\n");
+        printf("  exit\n");
+        printf("  bye\n");
+    } else {
+        if (strcmp(tr[1], "authors") == 0) {
+            printf("authors [-l|-n]: Muestra los autores del proyecto.\n");
+        } else if (strcmp(tr[1], "cd") == 0) {
+            printf("cd [directorio]: Cambia el directorio actual.\n");
+        } else if (strcmp(tr[1], "close") == 0) {
+            printf("close [df]: Cierra el descriptor de archivo indicado.\n");
+        } else if (strcmp(tr[1], "date") == 0) {
+            printf("date [-d|-t]: Muestra la fecha (-d) o la hora (-t) actual.\n");
+        } else if (strcmp(tr[1], "dup") == 0) {
+            printf("dup [df]: Duplica el descriptor de archivo.\n");
+        } else if (strcmp(tr[1], "historic") == 0) {
+            printf("historic [N|-N]: Muestra o repite comandos del histórico.\n");
+        } else if (strcmp(tr[1], "infosys") == 0) {
+            printf("infosys: Muestra información del sistema.\n");
+        } else if (strcmp(tr[1], "open") == 0) {
+            printf("open [file] [modo]: Abre un archivo con el modo especificado.\n");
+        } else if (strcmp(tr[1], "pid") == 0) {
+            printf("pid: Muestra el PID del proceso actual.\n");
+        } else if (strcmp(tr[1], "ppid") == 0) {
+            printf("ppid: Muestra el PPID del proceso padre.\n");
+        } else if (strcmp(tr[1], "quit") == 0 || strcmp(tr[1], "exit") == 0 || strcmp(tr[1], "bye") == 0) {
+            printf("quit/exit/bye: Finaliza la shell.\n");
+        } else {
+            printf("Comando no reconocido. Usa 'help' para ver los comandos disponibles.\n");
+        }
     }
 }

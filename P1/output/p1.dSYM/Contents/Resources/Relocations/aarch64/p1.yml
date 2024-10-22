@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/ivan/Documents/udc/segundo/1/SO/P1/output/p1'
+relocations:     []
+...

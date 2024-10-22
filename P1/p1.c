@@ -21,7 +21,7 @@ Lucas García Boenter - l.garcia-boente@udc.es
 #include <dirent.h>
 #include <pwd.h>
 #include <grp.h>
-
+#include <limits.h>
 
 // DEFINE
 #define MAX_INPUT 1024
@@ -51,10 +51,13 @@ typedef struct {
 } ListaFicheros;
 
 // Declaración de funciones
+
 void imprimirPrompt();
 void leerEntrada(char *entrada);
 void procesarEntrada(char *entrada, ListaHistorico *historico, ListaFicheros *listaFicheros);
 int TrocearCadena(char * entrada, char * trozos[]);
+
+//Funciones shell
 void Cmd_date(char *tr[]);
 void Cmd_historic(char *tr[], ListaHistorico *historico);
 void AnadirComando(ListaHistorico *historico, char *comando);
@@ -67,10 +70,17 @@ void Cmd_makefile(char *tr[]);
 void Cmd_makedir(char *tr[]);
 void Cmd_listfile(char *tr[]);
 void Cmd_listdir(char *tr[]);
+
+// Funciones extra
 char LetraTF (mode_t m);
 mode_t ConvierteCadenaAModo(const char *permisos);
 char * ConvierteModo (mode_t m, char *permisos);
 
+//Funciones liberación de memoria
+void liberarHistorico(ListaHistorico *historico);
+void liberarListaFicheros(ListaFicheros *listaFicheros);
+
+// Main
 int main(){
     char entrada[MAX_INPUT];
     ListaHistorico historico = {NULL, 0};
@@ -83,10 +93,15 @@ int main(){
         procesarEntrada(entrada, &historico, &listaFicheros);
     }
 
-    //liberar_memoria(&historico, &listaFicheros);
+    // Liberamos la memoria al final
+    liberarHistorico(&historico);
+    liberarListaFicheros(&listaFicheros);
 
     return 0;
 }
+
+
+// Funciones principales
 
 void imprimirPrompt(){
     printf("mi_shell-> ");
@@ -183,7 +198,7 @@ void procesarEntrada(char * entrada, ListaHistorico *historico, ListaFicheros *l
         Cmd_makedir(trozos);
     }
 
-    //LISTFILE -long -acc slink para ver que campos deben salir con listdir -long (son 8)
+    //LISTFILE -long -acc -link 
     else if(strcmp(trozos[0], "listfile") == 0){
         Cmd_listfile(trozos);
     }
@@ -343,6 +358,7 @@ void AnadirComando(ListaHistorico *historico, char *comando) {
     nuevo->siguiente = historico->cabeza;
     historico->cabeza = nuevo;
     historico->tamano++;
+    free(nuevo);
 }
 
 // Función para el comando "open"
@@ -580,32 +596,30 @@ void Cmd_makedir(char *trozos[]){
 //Función para el comando "listfile"
 void Cmd_listfile(char *trozos[]){
     struct stat fileStat;
-    char permisos[11];
+    char permisos[15];
     char timebuf[100]; // Para almacenar la fecha y hora
     struct tm *tm_info;
 
-    // Verificamos si se ha pasado el nombre del archivo
-    if (trozos[2] == NULL && trozos[1] == NULL) {
+    // Verificamos si se ha pasado el nombre del archivo y asignamos filename
+    char *filename = (trozos[2] != NULL) ? trozos[2] : trozos[1];
+
+    if (filename == NULL) {
         printf("Error: No se ha proporcionado el nombre del archivo.\n");
         return;
     }
-
-    // Verificamos si se ha pasado el nombre del archivo
-    char *filename = (trozos[2] != NULL) ? trozos[2] : trozos[1];
-    
 
     // Obtenemos la información del archivo
     if (stat(filename, &fileStat) == -1) {
         perror("Error al obtener información del archivo");
         return;
     }else{
-        if(trozos[2] == NULL){ //si no pasamos ninguna opción entonces muestra tamaño y nombre
+        if(trozos[2] == NULL){ //si no pasamos ninguna opción entonces muestra num-inodo y nombre
             // 1. Número de inodo (st_ino)
             printf("%lu\t", (unsigned long)fileStat.st_ino);
             // 2. Nombre del archivo
-            printf("%s\n", trozos[1]);
+            printf("%s\n", filename);
         }else {
-            // -long muestra -> 2024/10/02-12:12   1 (26211315)     ivan   ?????? -rwxr-xr-x   101960 shell-macos.out
+            // -long muestra -> 2024/10/02-12:12   1 (26211315)     ivan   staff -rwxr-xr-x   101960 shell-macos.out
             if(strcmp(trozos[1], "-long") == 0){
                 // 1. Fecha de modificación
                 tm_info = localtime(&fileStat.st_mtime);
@@ -620,7 +634,7 @@ void Cmd_listfile(char *trozos[]){
                 printf("%hu\t", fileStat.st_nlink);  // nlink_t es unsigned short
 
                 // 3. Tamaño del archivo (st_size)
-                printf("%lld\t", (long long)fileStat.st_size);  // off_t es long long
+                printf("(%lld)\t", (long long)fileStat.st_size);
 
                 // 4. Propietario (st_uid)
                 struct passwd *pw = getpwuid(fileStat.st_uid);
@@ -666,8 +680,20 @@ void Cmd_listfile(char *trozos[]){
             else if(strcmp(trozos[1], "-link") == 0){
                 // 1. Número de inodo (st_ino)
                 printf("%lu\t", (unsigned long)fileStat.st_ino);
-                // 2. Nombre del archivo
-                printf("%s\n", trozos[2]);
+                // 2. Verificamos si es un enlace simbólico
+                if (S_ISLNK(fileStat.st_mode)) {
+                    char link_target[PATH_MAX];
+                    ssize_t len = readlink(filename, link_target, sizeof(link_target) - 1);
+                    if (len != -1) {
+                        link_target[len] = '\0';  // Null-terminate la cadena
+                        printf("%s -> %s\n", filename, link_target);
+                    } else {
+                        perror("Error leyendo enlace simbólico");
+                    }
+                } else {
+                    // Si no es un enlace simbólico, solo mostramos el nombre del archivo
+                    printf("%s\n", filename);
+                }
             }
         }
     }
@@ -695,4 +721,30 @@ void Cmd_listdir(char *trozos[]){
         }
 
         closedir(directorio);  // Cierra el directorio después de leerlo
+}
+
+
+// Funciones para liberar memoria
+
+// liberamos la memoria del histórico
+void liberarHistorico(ListaHistorico *historico) {
+    Nodo *actual = historico->cabeza;
+    while (actual != NULL) {
+        Nodo *temp = actual;
+        actual = actual->siguiente;
+        free(temp);
+    }
+    historico->cabeza = NULL;  // Opcional: para evitar un puntero colgante
+}
+
+// liberamos la memoria de la lista de ficheros abiertos
+void liberarListaFicheros(ListaFicheros *listaFicheros) {
+    Fichero *actual = listaFicheros->cabeza;
+    while (actual != NULL) {
+        Fichero *temp = actual;
+        actual = actual->siguiente;
+        free(temp->nombre);  // Liberar el nombre
+        free(temp);          // Liberar el nodo
+    }
+    listaFicheros->cabeza = NULL;  // Opcional
 }
