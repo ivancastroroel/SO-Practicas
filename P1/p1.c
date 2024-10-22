@@ -801,8 +801,64 @@ void Cmd_erase(char *trozos[]) {
     }
 }
 
-void Cmd_delrec(char *trozos[]){
+void Cmd_delrec(char *trozos[]) {
+    struct stat st;
+    DIR *dir;
+    struct dirent *entradas;
+    char ruta[PATH_MAX];
 
+    if (trozos[1] == NULL) {
+        printf("No se han especificado archivos o directorios para borrar.\n");
+        return;
+    }
+    
+    for (int i = 1; trozos[i] != NULL; i++) {
+        // Verificar si existe el archivo o directorio
+        if (stat(trozos[i], &st) == -1) {
+            perror("Error al obtener información del archivo/directorio");
+            continue;
+        }
+
+        // Si es un archivo regular, se elimina
+        if (S_ISREG(st.st_mode)) {
+            if (unlink(trozos[i]) == -1) {
+                perror("Error al eliminar el archivo");
+            } else {
+                printf("Archivo %s eliminado.\n", trozos[i]);
+            }
+        }
+        // Si es un directorio, se procesa recursivamente
+        else if (S_ISDIR(st.st_mode)) {
+            // Abrir el directorio
+            if ((dir = opendir(trozos[i])) == NULL) {
+                perror("Error al abrir el directorio");
+                continue;
+            }
+
+            // Leer el contenido del directorio
+            while ((entradas = readdir(dir)) != NULL) {
+                // Omitir las entradas "." y ".."
+                if (strcmp(entradas->d_name, ".") == 0 || strcmp(entradas->d_name, "..") == 0) {
+                    continue;
+                }
+
+                // Construir la ruta completa
+                snprintf(ruta, sizeof(ruta), "%s/%s", trozos[i], entradas->d_name);
+
+                // Aplicar la eliminación recursiva
+                char *subruta[] = { "", ruta, NULL };
+                Cmd_delrec(subruta);
+            }
+            closedir(dir);
+
+            // Eliminar el directorio vacío después de eliminar su contenido
+            if (rmdir(trozos[i]) == -1) {
+                perror("Error al eliminar el directorio");
+            } else {
+                printf("Directorio %s eliminado.\n", trozos[i]);
+            }
+        }
+    }
 }
 
 // ----- FUNCIONES PARA LIBERAR MEMORIA -------
