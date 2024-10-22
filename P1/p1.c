@@ -1,7 +1,7 @@
 /*
 MIEMBROS
 Iván Castro Roel - ivan.castro.roel@udc.es
-Lucas García Boenter - l.garcia-boente@udc.es
+Lucas García Boenter - l.garcia-boenter@udc.es
 */
 
 
@@ -28,36 +28,42 @@ Lucas García Boenter - l.garcia-boente@udc.es
 #define MAX_TROZOS 10
 #define MAX_HISTORIC 100
 
-// Estructuras para el histórico y ficheros
+// ESTRUCTURAS PARA EL HISTÓRICO Y FICHEROS
+
+// - Estructura para Nodo
 typedef struct Nodo {
     char comando[MAX_INPUT];
     struct Nodo *siguiente;
 } Nodo;
 
+// - Estructura para la Lista del Histórico
 typedef struct {
     Nodo *cabeza;
     int tamano;
 } ListaHistorico;
 
+// - Estructura para los Ficheros que abrimos
 typedef struct Fichero {
     int descriptor;
     char *nombre;
     int modo;
-    struct Fichero *siguiente; // Puntero al siguiente nodo
+    struct Fichero *siguiente; // -> Puntero al siguiente nodo
 } Fichero;
 
+// - Estructura para la Lista de Ficheros que abrimos
 typedef struct {
     Fichero *cabeza;
 } ListaFicheros;
 
-// Declaración de funciones
+// ------ DECLARACIÓN DE FUNCIONES ------
 
+// - Funciones de inicio
 void imprimirPrompt();
 void leerEntrada(char *entrada);
 void procesarEntrada(char *entrada, ListaHistorico *historico, ListaFicheros *listaFicheros);
 int TrocearCadena(char * entrada, char * trozos[]);
 
-//Funciones shell
+// - Funciones shell
 void Cmd_date(char *tr[]);
 void Cmd_historic(char *tr[], ListaHistorico *historico);
 void AnadirComando(ListaHistorico *historico, char *comando);
@@ -70,8 +76,10 @@ void Cmd_makefile(char *tr[]);
 void Cmd_makedir(char *tr[]);
 void Cmd_listfile(char *tr[]);
 void Cmd_listdir(char *tr[]);
+void Cmd_erase(char *tr[]);
+void Cmd_delrec(char *tr[]);
 
-// Funciones extra
+// - Funciones extra
 char LetraTF (mode_t m);
 mode_t ConvierteCadenaAModo(const char *permisos);
 char * ConvierteModo (mode_t m, char *permisos);
@@ -80,7 +88,7 @@ char * ConvierteModo (mode_t m, char *permisos);
 void liberarHistorico(ListaHistorico *historico);
 void liberarListaFicheros(ListaFicheros *listaFicheros);
 
-// Main
+// ------ MAIN ------
 int main(){
     char entrada[MAX_INPUT];
     ListaHistorico historico = {NULL, 0};
@@ -101,7 +109,7 @@ int main(){
 }
 
 
-// Funciones principales
+// ------ FUNCIONES PRINCIPALES ------
 
 void imprimirPrompt(){
     printf("mi_shell-> ");
@@ -215,15 +223,21 @@ void procesarEntrada(char * entrada, ListaHistorico *historico, ListaFicheros *l
     else if(strcmp(trozos[0], "listdir") == 0){
         Cmd_listdir(trozos);
     }
-
+    //ERASE
+    else if(strcmp(trozos[0], "erase") == 0){
+        Cmd_erase(trozos);
+    }
+    //ERASE RECURSIVO
+    else if(strcmp(trozos[0], "delrec") == 0){
+        Cmd_delrec(trozos);
+    }
     else {
         printf("\nComando no reconocido\n");
     }
-    
 }
 
 
-// FUNCIONES EXTRA
+// ------ FUNCIONES EXTRA ------
 
 int TrocearCadena(char * cadena, char * trozos[]) {
     int i = 1;
@@ -296,7 +310,8 @@ char * ConvierteModo (mode_t m, char *permisos)
 
 
 
-// ----- FUNCIONES -----
+// ------ FUNCIONES SHELL ------
+
 // Función para el comando "date"
 void Cmd_date(char *tr[]) {
     time_t t;
@@ -723,8 +738,74 @@ void Cmd_listdir(char *trozos[]){
         closedir(directorio);  // Cierra el directorio después de leerlo
 }
 
+//Función para el comando "erase"
+void Cmd_erase(char *trozos[]) {
+    if (trozos[1] == NULL) {
+        printf("No se han especificado archivos o directorios para borrar.\n");
+        return;
+    }
 
-// Funciones para liberar memoria
+    for (int i = 1; trozos[i] != NULL; i++) { // Comenzamos desde 1 para omitir el nombre del comando
+        
+        // Verificamos si es un archivo o directorio
+        struct stat st;
+        if (stat(trozos[i], &st) == -1) {
+            perror("Error al acceder al archivo o directorio");
+            continue; // Continuar con el siguiente nombre
+        }
+
+        // Borrar el archivo
+        if (S_ISREG(st.st_mode)) {
+            if (remove(trozos[i]) == 0) {
+                printf("Archivo '%s' eliminado con éxito.\n", trozos[i]);
+            } else {
+                perror("Error al eliminar el archivo");
+            }
+        } 
+        // Borrar el directorio
+        else if (S_ISDIR(st.st_mode)) {
+            DIR *dir = opendir(trozos[i]);
+            if (!dir) {
+                perror("Error al abrir el directorio");
+                return;
+            }
+
+            // Contar las entradas en el directorio
+            struct dirent *entradas;
+            int isEmpty = 1;  // Asumimos que está vacío
+
+            while ((entradas = readdir(dir)) != NULL) {
+                if (strcmp(entradas->d_name, ".") != 0 && strcmp(entradas->d_name, "..") != 0) {
+                    isEmpty = 0;  // Encontramos algo que no es . o ..
+                    break;
+                }
+            }
+            closedir(dir);
+
+            // Si está vacío, eliminar el directorio
+            if (isEmpty) {
+                if (rmdir(trozos[i]) == 0) {
+                    printf("Directorio %s eliminado correctamente.\n", trozos[i]);
+                } else {
+                    perror("Error al eliminar el directorio");
+                }
+            } else {
+                printf("El directorio %s no está vacío y no se puede eliminar.\n", trozos[i]);
+            }
+        }
+
+        // Si no es un archivo regular ni un directorio
+        else {
+            printf("'%s' no es un archivo regular ni un directorio.\n", trozos[i]);
+        }
+    }
+}
+
+void Cmd_delrec(char *trozos[]){
+
+}
+
+// ----- FUNCIONES PARA LIBERAR MEMORIA -------
 
 // liberamos la memoria del histórico
 void liberarHistorico(ListaHistorico *historico) {
