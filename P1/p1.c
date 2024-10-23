@@ -97,8 +97,10 @@ int main(){
     while (1){
         imprimirPrompt();
         leerEntrada(entrada);
-        AnadirComando(&historico, entrada);  // Añadir el comando al histórico
-        procesarEntrada(entrada, &historico, &listaFicheros);
+        if (strncmp(entrada, "historic", 8) != 0) {  // Comando no es 'historic' o 'historic N'
+            AnadirComando(&historico, entrada);  // Añadir el comando al histórico
+        }
+        procesarEntrada(entrada, &historico, &listaFicheros);        
     }
 
     // Liberamos la memoria al final
@@ -342,26 +344,30 @@ void Cmd_historic(char *tr[], ListaHistorico *historico) {
 
     if (tr[1] == NULL) {  // Mostrar todo el histórico
         while (actual != NULL) {
-            printf("%d: %s", contador++, actual->comando);
+            printf("%d-> %s\n", contador++, actual->comando);
             actual = actual->siguiente;
         }
     } else if (tr[1][0] == '-') {  // Mostrar últimos N comandos
-        int N = atoi(tr[1] + 1); 
+        int N = atoi(tr[1] + 1);
         actual = historico->cabeza;
         while (actual != NULL && contador < N) {
-            printf("%d: %s", contador++, actual->comando);
+            printf("%d-> %s\n", contador++, actual->comando);
             actual = actual->siguiente;
         }
     } else {  // Repetir comando N
         int N = atoi(tr[1]);
         actual = historico->cabeza;
+        
+        // Moverse hasta el comando en la posición N
         while (actual != NULL && contador < N) {
             actual = actual->siguiente;
             contador++;
         }
         if (actual != NULL) {
-            printf("Repitiendo comando: %s\n", actual->comando);
+            printf("Ejecutando hist (%d): %s\n", N, actual->comando);
             procesarEntrada(actual->comando, historico, NULL);
+        } else {
+            printf("No hay comando en la posición %d\n", N);
         }
     }
 }
@@ -373,7 +379,6 @@ void AnadirComando(ListaHistorico *historico, char *comando) {
     nuevo->siguiente = historico->cabeza;
     historico->cabeza = nuevo;
     historico->tamano++;
-    free(nuevo);
 }
 
 // Función para el comando "open"
@@ -536,6 +541,15 @@ void Cmd_help(char *tr[]) {
         printf("  quit\n");
         printf("  exit\n");
         printf("  bye\n");
+        printf("  makefile\n");
+        printf("  makedir\n");
+        printf("  listfile\n");
+        printf("  cwd\n");
+        printf("  listdir\n");
+        printf("  reclist\n");        
+        printf("  revlist\n");
+        printf("  erase\n");        
+        printf("  delrec\n");
     } else {
         if (strcmp(tr[1], "authors") == 0) {
             printf("authors [-l|-n]: Muestra los autores del proyecto.\n");
@@ -559,7 +573,41 @@ void Cmd_help(char *tr[]) {
             printf("ppid: Muestra el PPID del proceso padre.\n");
         } else if (strcmp(tr[1], "quit") == 0 || strcmp(tr[1], "exit") == 0 || strcmp(tr[1], "bye") == 0) {
             printf("quit/exit/bye: Finaliza la shell.\n");
-        } else {
+        } else if(strcmp(tr[1], "makefile") == 0){
+            printf("makefile [name] crea un fichero de nombre name");
+        } else if(strcmp(tr[1], "makedir") == 0){
+            printf("makedir [name]	Crea un directorio de nombre name");
+        } else if(strcmp(tr[1], "makefile") == 0){
+            printf("listfile [-long][-link][-acc] name1 name2 .. lista ficheros;\n"
+                    "\t-long: listado largo\n"
+                    "\t-acc: acesstime\n"
+                    "\t-link: si es enlace simbolico, el path contenido\n");
+        }else if(strcmp(tr[1], "cwd") == 0){
+            printf("cwd\tMuestra el directorio actual del shell");
+        }else if(strcmp(tr[1], "listdir") == 0){
+            printf("listdir [-hid][-long][-link][-acc] n1 n2 ..	lista contenidos de directorios;\n"
+                    "\t-long: listado largo\n"
+                    "\t-hid: incluye los ficheros ocultos\n"
+                    "\t-acc: acesstime\n"
+                    "\t-link: si es enlace simbolico, el path contenido\n");
+        }else if(strcmp(tr[1], "reclist") == 0){
+            printf("reclist [-hid][-long][-link][-acc] n1 n2 ..	lista recursivamente contenidos de directorios (subdirs despues)\n"
+                    "\t-thid: incluye los ficheros ocultos\n"
+                    "\t-long: listado largo\n"
+                    "\t-acc: acesstime\n"
+                    "\t-link: si es enlace simbolico, el path contenido\n");
+        }else if(strcmp(tr[1], "revlist") == 0){
+            printf("revlist [-hid][-long][-link][-acc] n1 n2 ..	lista recursivamente contenidos de directorios (subdirs antes)"
+                    "\t-hid: incluye los ficheros ocultos\n"
+                    "\t-long: listado largo\n"
+                    "\t-acc: acesstime\n"
+                    "\t-link: si es enlace simbolico, el path contenido\n");
+        }else if(strcmp(tr[1], "revlist") == 0){
+            printf("erase [name1 name2 ..]	Borra ficheros o directorios vacios");
+        }else if(strcmp(tr[1], "delrec") == 0){
+            printf("delrec [name1 name2 ..]	Borra ficheros o directorios no vacios recursivamente");
+        }
+         else {
             printf("Comando no reconocido. Usa 'help' para ver los comandos disponibles.\n");
         }
     }
