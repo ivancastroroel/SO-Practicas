@@ -97,10 +97,8 @@ int main(){
     while (1){
         imprimirPrompt();
         leerEntrada(entrada);
-        if (strncmp(entrada, "historic", 8) != 0) {  // Comando no es 'historic' o 'historic N'
-            AnadirComando(&historico, entrada);  // Añadir el comando al histórico
-        }
-        procesarEntrada(entrada, &historico, &listaFicheros);        
+        AnadirComando(&historico, entrada);
+        procesarEntrada(entrada, &historico, &listaFicheros);
     }
 
     // Liberamos la memoria al final
@@ -347,11 +345,26 @@ void Cmd_historic(char *tr[], ListaHistorico *historico) {
             printf("%d-> %s\n", contador++, actual->comando);
             actual = actual->siguiente;
         }
-    } else if (tr[1][0] == '-') {  // Mostrar últimos N comandos
+    } else if (tr[1][0] == '-') {  // Mostrar últimos -N comandos
         int N = atoi(tr[1] + 1);
         actual = historico->cabeza;
-        while (actual != NULL && contador < N) {
-            printf("%d-> %s\n", contador++, actual->comando);
+        // Contamos el total de comandos primero para saber desde dónde empezar
+        int total = historico->tamano;
+
+        if (N > total) N = total;  // Evitamos errores por si N es mayor que el total de comandos
+
+        // Nos movemos a la posición -N para empezar a imprimir
+        for (int i = 0; i < total - N - 1; i++) {
+            actual = actual->siguiente;
+        }
+
+        // Imprimimos los últimos N comandos
+        while (actual != NULL) {
+            if(contador==N){
+                break;
+            }
+            contador++;
+            printf("- %s\n", actual->comando);
             actual = actual->siguiente;
         }
     } else {  // Repetir comando N
@@ -376,9 +389,20 @@ void Cmd_historic(char *tr[], ListaHistorico *historico) {
 void AnadirComando(ListaHistorico *historico, char *comando) {
     Nodo *nuevo = (Nodo *)malloc(sizeof(Nodo));
     strcpy(nuevo->comando, comando);
-    nuevo->siguiente = historico->cabeza;
-    historico->cabeza = nuevo;
-    historico->tamano++;
+    nuevo->siguiente = NULL;
+    // Si la lista está vacía, el nuevo nodo será la cabeza
+    if (historico->cabeza == NULL) {
+        historico->cabeza = nuevo;
+    } else {
+        // Si no está vacía, recorremos hasta el último nodo
+        Nodo *actual = historico->cabeza;
+        while (actual->siguiente != NULL) {
+            actual = actual->siguiente;
+        }
+        // Añadimos el nuevo nodo al final de la lista
+        actual->siguiente = nuevo;
+    }
+    historico->tamano++;  // Aumentamos el tamaño de la lista
 }
 
 // Función para el comando "open"
