@@ -45,8 +45,8 @@ char LetraTF(mode_t m);
 char *ConvierteModo2(mode_t m);
 void createDir(char *name);
 void createFile(char *name);
-void delete(char *name);
-void deleteTree(char *name);
+void erase(char *name);
+void delrec(char *name);
 void listFile(command argumentos);
 void listDir(command argumentos, bool longg, bool recb, bool reca, bool hid, bool link, bool acc);
 
@@ -202,7 +202,7 @@ char *ConvierteModo2(mode_t m)
 
 int chooseCommand(char *argument1, char *argument2, char *argument3) // comprobamos que comando hemos pasado
 {
-    // ---- Lab Assigment 1 ----
+    // ---- Lab Assigment 0 ----
     if (argument2 != NULL && (!strcmp(argument2, "-?") || !strcmp(argument2, "-help")) && argument3 == NULL)
         return 27;
     if (strcmp(argument1, "authors") == 0) // authors
@@ -233,9 +233,9 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
             return 7;
         else if (strcmp(argument2, "-c") == 0 && argument3 == NULL)
             return 8;
-        else if ((argument2[0] == '-N' && isdigit(argument2[1])) && argument3 == NULL)
+        else if ((strcmp(argument2, "-N") == 0) && argument3 == NULL)
             return 9;
-        else if ((argument2[0] == 'N' && isdigit(argument2[1])) && argument3 == NULL)
+        else if ((strcmp(argument2, "N") == 0) && argument3 == NULL)
             return 10;
     }
 
@@ -285,7 +285,7 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
         return 21;
 
 
-    // ---- Lab Assigment 2 ----
+    // ---- Lab Assigment 1 ----
     else if (strcmp(argument1, "makefile") == 0)
     {
         if (argument2 == NULL)
@@ -327,21 +327,13 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
             return 13;
     }
 
-    else if (strcmp(argument1, "list") == 0)
+    else if (strcmp(argument1, "cwd") == 0)
     {
-        if (argument2 != NULL)
-            return 25;
-        else
-            return 13;
+        return 15;
     }
 
-    else if (strcmp(argument1, "stat") == 0)
-    {
-        if (argument2 == NULL)
-            return 13;
-        else
-            return 26;
-    }
+
+// ---- Lab Assigment 2
 
     else if (!strcmp(argument1, "malloc"))
     {
@@ -488,13 +480,14 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         listDir(argumentos, false, false, false, false, false, false);
         break;
 
-    case 26: // deltree
-        deleteTree(argument2);
+    case 26: // erase
+        erase(argument2);
         break;
 
-    case 27: // delete
-        delete (argument2);
+    case 27: // delrec
+        delrec(argument2);
         break;
+
 
     /* case 29: // malloc [size]
         mallocMemoria(atoi(argument2), listaMemoria);
@@ -931,59 +924,68 @@ void createDir(char *name) //makedir [name]
 void listFile(command argumentos)
 {
     struct stat s;
-    bool longg = false, acc = false, link = 0;
+    bool longg = false, acc = false, link = false; // Ahora cada opción es independiente
     struct tm *fecha;
     char *trozos[COMMAND_LENGTH], permisos[COMMAND_LENGTH];
     int i;
-    char longFecha[COMMAND_LENGTH], hardlink[COMMAND_LENGTH], inode[COMMAND_LENGTH], *symbolicLink;
+    char longFecha[COMMAND_LENGTH], *symbolicLink;
 
     trocearCadena(argumentos, trozos);
 
+    // Validar las opciones y asegurarse de que solo una esté activa
     for (i = 1; trozos[i] != NULL; i++)
     {
         if (!strcmp(trozos[i], "-long"))
             longg = true;
-        if (!strcmp(trozos[i], "-link"))
+        else if (!strcmp(trozos[i], "-link"))
             link = true;
-        if (!strcmp(trozos[i], "-acc"))
+        else if (!strcmp(trozos[i], "-acc"))
             acc = true;
+    }
+
+    // Si más de una opción está activada, mostrar error y salir
+    if ((longg + link + acc) > 1)
+    {
+        printf("Error: Solo puede activarse una opción a la vez (-long, -link, -acc).\n");
+        return;
     }
 
     i = 0;
     while (trozos[i] != NULL)
     {
-        if (trozos[i][0] != '-' && strcmp(trozos[i], "stat")) // Con esto indicamos que estamos en el nombre de un fichero o directorio
+        if (trozos[i][0] != '-' && strcmp(trozos[i], "stat")) // Validar si es un archivo/directorio
         {
             if (lstat(trozos[i], &s))
                 perror("No se puede listar contenido");
             else
             {
-
-                if (!longg) // Cuando solo está stat, o están las otras opciones sin este, ya que no funcionan sin -long
-                    printf("%10lu  %.50s\n", s.st_size, trozos[i]);
-                else
+                if (longg) // Si la opción -long está activada
                 {
-                    if (!acc)
-                        fecha = localtime(&s.st_mtime); // si -acc no está activado obtenemos el tiempo basado en la última modificación
-                    else
-                        fecha = localtime(&s.st_atime); // si -acc está activado obtenemos el tiempo basado en el último acceso
+                    fecha = localtime(&s.st_mtime); // Última modificación
+                    strcpy(permisos, ConvierteModo2(s.st_mode)); // Obtener permisos
+                    sprintf(longFecha, "%02d/%02d/%d-%02d:%02d", fecha->tm_mday, fecha->tm_mon + 1, fecha->tm_year + 1900, fecha->tm_hour, fecha->tm_min);
 
-                    strcpy(permisos, ConvierteModo2(s.st_mode)); // obtenemos los permisos en formato string "rwxrwxrwxsst"
+                    printf("%s %10lu %s\n", permisos, s.st_size, trozos[i]); // Permisos, tamaño, nombre
+                }
+                else if (link && LetraTF(s.st_mode) == 'l') // Si la opción -link está activada y es un enlace simbólico
+                {
+                    symbolicLink = malloc(s.st_size + 1);
+                    readlink(trozos[i], symbolicLink, s.st_size + 1);
+                    symbolicLink[s.st_size] = '\0';
 
-                    sprintf(longFecha, "%d/%d/%d-%d:%d", (fecha->tm_year + 1900), fecha->tm_mon + 1, fecha->tm_mday, fecha->tm_hour, fecha->tm_min); // formato de la fecha
-                    sprintf(hardlink, "%ld", s.st_nlink);                                                                                            // número de hardlinks
-                    sprintf(inode, "(%ld)", s.st_ino);                                                                                               // número inodo
+                    printf("%s -> %s\n", trozos[i], symbolicLink); // Nombre del enlace -> destino
+                    free(symbolicLink);
+                }
+                else if (acc) // Si la opción -acc está activada
+                {
+                    fecha = localtime(&s.st_atime); // Último acceso
+                    sprintf(longFecha, "%02d/%02d/%d-%02d:%02d", fecha->tm_mday, fecha->tm_mon + 1, fecha->tm_year + 1900, fecha->tm_hour, fecha->tm_min);
 
-                    if (link && LetraTF(s.st_mode) == 'l') // si la opción -link está activa
-                    {
-                        symbolicLink = malloc(s.st_size + 1);
-                        readlink(trozos[i], symbolicLink, s.st_size + 1); // guardamos en symbolicLink el nombre del fichero al que apunta la entrada actual
-                        symbolicLink[s.st_size] = '\0';
-                        printf("%20s%5s%10s%10s%10s %10s%10lu  %.50s -> %s\n", longFecha, hardlink, inode, getpwuid(s.st_uid)->pw_name, getgrgid(s.st_gid)->gr_name, permisos, s.st_size, trozos[i], symbolicLink);
-                        free(symbolicLink);
-                    }
-                    else
-                        printf("%20s%5s%10s%10s%10s %10s%10lu  %.50s\n", longFecha, hardlink, inode, getpwuid(s.st_uid)->pw_name, getgrgid(s.st_gid)->gr_name, permisos, s.st_size, trozos[i]);
+                    printf("%s: Último acceso: %s\n", trozos[i], longFecha);
+                }
+                else // Caso por defecto: Mostrar nombre del archivo
+                {
+                    printf("%s\n", trozos[i]);
                 }
             }
         }
@@ -1130,7 +1132,7 @@ void listDir(command argumentos, bool longg, bool recb, bool reca, bool hid, boo
 }
 
 
-void delete(char *name)
+void erase(char *name) // erase [name1] [name2] ...
 {
     struct stat sb;
     char tipo;
@@ -1154,7 +1156,7 @@ void delete(char *name)
     }
 }
 
-void deleteTree(char *name)
+void delrec(char *name) // delrec [name1] [name2] ...
 {
     struct stat sb;
     struct dirent *entrada;
