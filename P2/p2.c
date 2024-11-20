@@ -43,12 +43,14 @@ void dupDf(List *listaFicheros, int df);
 void help(char *cadena[]);
 char LetraTF(mode_t m);
 char *ConvierteModo2(mode_t m);
-void createDir(char *name);
-void createFile(char *name);
+void makeDir(char *name);
+void makeFile(char *name);
 void erase(char *name);
 void delrec(char *name);
 void listFile(command argumentos);
-void listDir(command argumentos, bool longg, bool recb, bool reca, bool hid, bool link, bool acc);
+void listDir(command argumentos, bool longg, bool hid, bool link, bool acc);
+void revlist(const char *path, bool longg, bool hid, bool link, bool acc);
+void reclist(const char *path, bool longg, bool hid, bool link, bool acc);
 
 // MAIN
 int main(int argc, char *argv[], char *env[])
@@ -311,7 +313,7 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
     {
         return 25;
     }
-    else if (strcmp(argument1, "delete") == 0)
+    else if (strcmp(argument1, "erase") == 0)
     {
         if (argument2 != NULL && argument3 == NULL)
             return 23;
@@ -319,7 +321,7 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
             return 13;
     }
 
-    else if (strcmp(argument1, "deltree") == 0)
+    else if (strcmp(argument1, "delrec") == 0)
     {
         if (argument2 != NULL && argument3 == NULL)
             return 24;
@@ -330,6 +332,15 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
     else if (strcmp(argument1, "cwd") == 0)
     {
         return 15;
+    }
+
+    else if (strcmp(argument1, "reclist") == 0)
+    {
+        return 28;
+    }
+    else if (strcmp(argument1, "revlist") == 0)
+    {
+        return 29;
     }
 
 
@@ -464,12 +475,12 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         help(&argument2);
         break;
 
-    case 22: // create file
-        createFile(argument3);
+    case 22: // makefile
+        makeFile(argument3);
         break;
 
-    case 23: // create dir
-        createDir(argument2);
+    case 23: // makedir
+        makeDir(argument2);
         break;
 
     case 24: // listfile
@@ -477,7 +488,7 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         break;
 
     case 25: // listdir
-        listDir(argumentos, false, false, false, false, false, false);
+        listDir(argumentos, false, false, false, false);
         break;
 
     case 26: // erase
@@ -488,6 +499,13 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         delrec(argument2);
         break;
 
+    case 28:
+        reclist(argumentos, false, false, false, false);
+        break;
+
+    case 29:
+        revlist(argumentos, false, false, false, false);
+        break;
 
     /* case 29: // malloc [size]
         mallocMemoria(atoi(argument2), listaMemoria);
@@ -856,19 +874,19 @@ void help(char *cadena[])
     else if (strcmp(*cadena, "bye") == 0)
         printf("bye\tTermina la ejecucion del shell\n");
 
-    else if (strcmp(*cadena, "stat") == 0)
+    else if (strcmp(*cadena, "listfile") == 0)
         printf("stat\t[-long][-link][-acc] name1 name2..\t\tlista ficheros;\n\t\t-long: listado largo\n\t\t-acc: acesstime\n\t\t-link: si es enlace simbolico, el path contenido\n");
 
-    else if (strcmp(*cadena, "list") == 0)
-        printf("list [-reca] [-recb] [-hid][-long][-link][-acc] n1 n2 ..	lista contenidos de directorios\n\t\t-hid:incluye los ficheros ocultos\n\t\t-recb:recursivo (antes)\n\t\t-reca: recursivo (despues)\n\t\tresto parametros como stat\n");
+    else if (strcmp(*cadena, "listdir") == 0)
+        printf("listdir [-reca] [-recb] [-hid][-long][-link][-acc] n1 n2 ..	lista contenidos de directorios\n\t\t-hid:incluye los ficheros ocultos\n\t\t-recb:recursivo (antes)\n\t\t-reca: recursivo (despues)\n\t\tresto parametros como stat\n");
 
-    else if (strcmp(*cadena, "create") == 0)
-        printf("create [-f] [name]	Crea un directorio o un fichero (-f)\n");
+    else if (strcmp(*cadena, "makefile") == 0)
+        printf("makefile [-f] [name]	Crea un directorio o un fichero (-f)\n");
 
-    else if (strcmp(*cadena, "deltree") == 0)
-        printf("deltree [name1 name2 ..]	Borra ficheros o directorios no vacios recursivamente\n");
+    else if (strcmp(*cadena, "delrec") == 0)
+        printf("delrec [name1 name2 ..]	Borra ficheros o directorios no vacios recursivamente\n");
 
-    else if (strcmp(*cadena, "delete") == 0)
+    else if (strcmp(*cadena, "erase") == 0)
         printf("delete [name1 name2 ..]	Borra ficheros o directorios vacios\n");
 
     else if (strcmp(*cadena, "malloc") == 0)
@@ -902,7 +920,7 @@ void help(char *cadena[])
         printf("%s no encontrado\n", *cadena);
 }
 
-void createFile(char *name) //makefile [name]
+void makeFile(char *name) //makefile [name]
 {
     int df;
 
@@ -914,12 +932,11 @@ void createFile(char *name) //makefile [name]
         close(df);
 }
 
-void createDir(char *name) //makedir [name]
+void makeDir(char *name) //makedir [name]
 {
     if (mkdir(name, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0) // los permisos son rwxrwxr-x
         perror("Imposible crear directorio");
 }
-
 
 void listFile(command argumentos)
 {
@@ -955,7 +972,7 @@ void listFile(command argumentos)
     {
         if (trozos[i][0] != '-' && strcmp(trozos[i], "stat")) // Validar si es un archivo/directorio
         {
-            if (lstat(trozos[i], &s))
+            if (stat(trozos[i], &s))
                 perror("No se puede listar contenido");
             else
             {
@@ -993,7 +1010,7 @@ void listFile(command argumentos)
     }
 }
 
-void listDir(command argumentos, bool longg, bool recb, bool reca, bool hid, bool link, bool acc)
+/* void listDir(command argumentos, bool longg, bool recb, bool reca, bool hid, bool link, bool acc)
 {
     struct stat sb;
     struct dirent *entrada;
@@ -1129,6 +1146,221 @@ void listDir(command argumentos, bool longg, bool recb, bool reca, bool hid, boo
         }
         i++;
     }
+} */
+
+
+void listDir(command argumentos, bool longg, bool hid, bool link, bool acc)
+{
+    struct stat sb;
+    struct dirent *entrada;
+    struct tm *fecha;
+    DIR *directorio;
+    char *trozos[COMMAND_LENGTH], permisos[COMMAND_LENGTH];
+    int i;
+    char longFecha[COMMAND_LENGTH], hardlink[COMMAND_LENGTH], inode[COMMAND_LENGTH], *symbolicLink;
+
+    trocearCadena(argumentos, trozos);
+
+    for (i = 1; trozos[i] != NULL; i++) // Detectar opciones
+    {
+        if (!strcmp(trozos[i], "-long"))
+            longg = true;
+        if (!strcmp(trozos[i], "-hid"))
+            hid = true;
+        if (!strcmp(trozos[i], "-link"))
+            link = true;
+        if (!strcmp(trozos[i], "-acc"))
+            acc = true;
+    }
+
+    i = 0;
+    while (trozos[i] != NULL)
+    {
+        if (trozos[i][0] != '-' && strcmp(trozos[i], "list")) // Nombre del fichero/directorio
+        {
+            if (lstat(trozos[i], &sb))
+                perror("No se puede listar contenido");
+            else if ((directorio = opendir(trozos[i])) != NULL)
+            {
+                printf("************%s\n", trozos[i]);
+
+                while ((entrada = readdir(directorio)) != NULL)
+                {
+                    if (!hid && entrada->d_name[0] == '.')
+                        continue;
+
+                    char filename[strlen(trozos[i]) + strlen(entrada->d_name) + 5];
+                    sprintf(filename, "%s/%s", trozos[i], entrada->d_name);
+                    lstat(filename, &sb);
+
+                    if (!longg)
+                        printf("%10lu %.50s\n", sb.st_size, entrada->d_name);
+                    else
+                    {
+                        if (!acc)
+                            fecha = localtime(&sb.st_mtime);
+                        else
+                            fecha = localtime(&sb.st_atime);
+
+                        strcpy(permisos, ConvierteModo2(sb.st_mode));
+                        sprintf(longFecha, "%d/%d/%d-%d:%d", (fecha->tm_year + 1900), fecha->tm_mon + 1, fecha->tm_mday, fecha->tm_hour, fecha->tm_min);
+                        sprintf(hardlink, "%ld", sb.st_nlink);
+                        sprintf(inode, "(%ld)", sb.st_ino);
+
+                        if (link && LetraTF(sb.st_mode) == 'l')
+                        {
+                            symbolicLink = malloc(sb.st_size + 1);
+                            readlink(filename, symbolicLink, sb.st_size + 1);
+                            symbolicLink[sb.st_size] = '\0';
+                            printf("%20s%5s%10s%10s%10s %10s%10lu  %.50s -> %s\n", longFecha, hardlink, inode, getpwuid(sb.st_uid)->pw_name, getgrgid(sb.st_gid)->gr_name, permisos, sb.st_size, entrada->d_name, symbolicLink);
+                            free(symbolicLink);
+                        }
+                        else
+                            printf("%20s%5s%10s%10s%10s %10s%10lu  %.50s\n", longFecha, hardlink, inode, getpwuid(sb.st_uid)->pw_name, getgrgid(sb.st_gid)->gr_name, permisos, sb.st_size, entrada->d_name);
+                    }
+                }
+                closedir(directorio);
+            }
+        }
+        i++;
+    }
+}
+void revlist(const char *path, bool longg, bool hid, bool link, bool acc)
+{
+    struct stat sb;
+    struct dirent *entrada;
+    struct tm *fecha;
+    DIR *directorio;
+    char permisos[COMMAND_LENGTH];
+    char longFecha[COMMAND_LENGTH], *symbolicLink;
+
+    if ((directorio = opendir(path)) == NULL) {
+        perror("No se puede abrir el directorio");
+        return;
+    }
+
+    while ((entrada = readdir(directorio)) != NULL) {
+        if (!hid && entrada->d_name[0] == '.') // Omitir ocultos si no está activada la opción
+            continue;
+
+        char filename[PATH_MAX];
+        snprintf(filename, sizeof(filename), "%s/%s", path, entrada->d_name);
+
+        if (lstat(filename, &sb) == -1) {
+            perror("Error al obtener información del archivo");
+            continue;
+        }
+
+        if (LetraTF(sb.st_mode) == 'd' && strcmp(entrada->d_name, ".") && strcmp(entrada->d_name, "..")) {
+            // Si es un subdirectorio, llamar recursivamente a revlist antes de listar el contenido actual
+            revlist(filename, longg, hid, link, acc);
+        }
+    }
+
+    closedir(directorio);
+
+    // Imprimir contenido del directorio actual después de los subdirectorios
+    if ((directorio = opendir(path)) == NULL) {
+        perror("No se puede abrir el directorio");
+        return;
+    }
+
+    printf("************ %s ************\n", path);
+
+    while ((entrada = readdir(directorio)) != NULL) {
+        if (!hid && entrada->d_name[0] == '.')
+            continue;
+
+        char filename[PATH_MAX];
+        snprintf(filename, sizeof(filename), "%s/%s", path, entrada->d_name);
+
+        if (lstat(filename, &sb) == -1) {
+            perror("Error al obtener información del archivo");
+            continue;
+        }
+
+        if (LetraTF(sb.st_mode) != 'd' || !strcmp(entrada->d_name, ".") || !strcmp(entrada->d_name, "..")) {
+            if (longg) {
+                fecha = localtime(!acc ? &sb.st_mtime : &sb.st_atime);
+                strcpy(permisos, ConvierteModo2(sb.st_mode));
+                snprintf(longFecha, sizeof(longFecha), "%02d/%02d/%d-%02d:%02d", 
+                         fecha->tm_mday, fecha->tm_mon + 1, fecha->tm_year + 1900, 
+                         fecha->tm_hour, fecha->tm_min);
+
+                if (link && LetraTF(sb.st_mode) == 'l') {
+                    symbolicLink = malloc(sb.st_size + 1);
+                    readlink(filename, symbolicLink, sb.st_size + 1);
+                    symbolicLink[sb.st_size] = '\0';
+                    printf("%s %10lu %s -> %s\n", longFecha, sb.st_size, entrada->d_name, symbolicLink);
+                    free(symbolicLink);
+                } else {
+                    printf("%s %10lu %s\n", longFecha, sb.st_size, entrada->d_name);
+                }
+            } else {
+                printf("%s\n", entrada->d_name);
+            }
+        }
+    }
+
+    closedir(directorio);
+}
+
+
+void reclist(const char *path, bool longg, bool hid, bool link, bool acc)
+{
+    struct stat sb;
+    struct dirent *entrada;
+    struct tm *fecha;
+    DIR *directorio;
+    char permisos[COMMAND_LENGTH];
+    char longFecha[COMMAND_LENGTH], *symbolicLink;
+
+    if ((directorio = opendir(path)) == NULL) {
+        perror("No se puede abrir el directorio");
+        return;
+    }
+
+    printf("************ %s ************\n", path);
+
+    while ((entrada = readdir(directorio)) != NULL) {
+        if (!hid && entrada->d_name[0] == '.') // Omitir ocultos si no está activada la opción
+            continue;
+
+        char filename[PATH_MAX];
+        snprintf(filename, sizeof(filename), "%s/%s", path, entrada->d_name);
+
+        if (lstat(filename, &sb) == -1) {
+            perror("Error al obtener información del archivo");
+            continue;
+        }
+
+        if (LetraTF(sb.st_mode) == 'd' && strcmp(entrada->d_name, ".") && strcmp(entrada->d_name, "..")) {
+            // Si es un subdirectorio, llamar recursivamente a reclist
+            reclist(filename, longg, hid, link, acc);
+        } else {
+            if (longg) {
+                fecha = localtime(!acc ? &sb.st_mtime : &sb.st_atime);
+                strcpy(permisos, ConvierteModo2(sb.st_mode));
+                snprintf(longFecha, sizeof(longFecha), "%02d/%02d/%d-%02d:%02d", 
+                         fecha->tm_mday, fecha->tm_mon + 1, fecha->tm_year + 1900, 
+                         fecha->tm_hour, fecha->tm_min);
+
+                if (link && LetraTF(sb.st_mode) == 'l') {
+                    symbolicLink = malloc(sb.st_size + 1);
+                    readlink(filename, symbolicLink, sb.st_size + 1);
+                    symbolicLink[sb.st_size] = '\0';
+                    printf("%s %10lu %s -> %s\n", longFecha, sb.st_size, entrada->d_name, symbolicLink);
+                    free(symbolicLink);
+                } else {
+                    printf("%s %10lu %s\n", longFecha, sb.st_size, entrada->d_name);
+                }
+            } else {
+                printf("%s\n", entrada->d_name);
+            }
+        }
+    }
+
+    closedir(directorio);
 }
 
 
@@ -1188,7 +1420,7 @@ void delrec(char *name) // delrec [name1] [name2] ...
                     tipo = LetraTF(sb.st_mode);
 
                     if (tipo == 'd')
-                        deleteTree(filename); // si es un directorio, llamamos a deleteTree de manera recursiva
+                        delrec(filename); // si es un directorio, llamamos a deleteTree de manera recursiva
                     else
                         unlink(filename); // si es un fichero hacemos unlink
                 }
