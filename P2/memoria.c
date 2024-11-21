@@ -144,22 +144,29 @@ void *ObtenerMemoriaShmget(key_t clave, size_t tam, ListM *M)
     return (p);
 }
 
-void SharedExistent(char *arguments, ListM *M)
-{
+void SharedExistent(char *arguments, ListM *M) {
     key_t cl;
-    size_t tam;
     void *p;
     char *tr[COMMAND_LENGTH];
 
+    // Trocear los argumentos y obtener la clave
     trocearCadena(arguments, tr);
 
-    cl = (key_t)strtoul(tr[1], NULL, 10);
-    tam = 0;
+    if (tr[1] == NULL) {
+        printf("Uso: -shared <clave>\n");
+        return;
+    }
 
-    if ((p = ObtenerMemoriaShmget(cl, tam, M)) != NULL)
-        printf("Memoria compartida de clave %lu en %p\n", (unsigned long)cl, p);
-    else
-        printf("Imposible asignar memoria compartida clave %lu:%s\n", (unsigned long)cl, strerror(errno));
+    cl = (key_t)strtoul(tr[2], NULL, 10);
+
+    // Intentar acceder al segmento existente
+    if ((p = ObtenerMemoriaShmget(cl, 0, M)) != NULL) { // tam=0, accede a segmento existente
+        printf("Memoria compartida asignada:\n");
+        printf("  Clave: %lu\n", (unsigned long)cl);
+        printf("  Dirección: %p\n", p);
+    } else {
+        printf("Error accediendo a memoria compartida. Clave %lu: %s\n", (unsigned long)cl, strerror(errno));
+    }
 }
 
 void ShareFree(int key, ListM *M)
@@ -202,25 +209,34 @@ void SharedCreate(char *trozos, ListM *M)
     size_t tam;
     void *p;
     char *tr[COMMAND_LENGTH];
-
     trocearCadena(trozos, tr);
-    if (tr[3] == NULL)
+
+    if (tr[2] == NULL || tr[3] == NULL)
     {
-        printListM(*M, "shared");
+        fprintf(stderr, "Uso: shared -create <clave> <tamano>\n");
         return;
     }
 
     cl = (key_t)strtoul(tr[2], NULL, 10);
     tam = (size_t)strtoul(tr[3], NULL, 10);
+
     if (tam == 0)
     {
-        printf("No se asignan bloques de 0 bytes\n");
+        fprintf(stderr, "Error: No se pueden asignar bloques de 0 bytes.\n");
         return;
     }
-    if ((p = ObtenerMemoriaShmget(cl, tam, M)) != NULL)
+
+    // Llamar a la función para obtener memoria compartida
+    p = ObtenerMemoriaShmget(cl, tam, M);
+    if (p != NULL)
+    {
         printf("Asignados %lu bytes en %p\n", (unsigned long)tam, p);
+    }
     else
-        printf("Imposible asignar memoria compartida clave %lu:%s\n", (unsigned long)cl, strerror(errno));
+    {
+        fprintf(stderr, "Error al asignar memoria compartida clave %lu: %s\n",
+                (unsigned long)cl, strerror(errno));
+    }
 }
 
 void *MapearFichero(char *fichero, int protection, ListM *L)
@@ -291,7 +307,7 @@ void mmapFree(char *fichero, ListM *L)
     deleteAtPositionM(p, L);
 }
 
-int LeerFichero(char *f, char *p, command argumentos)
+int readfile(char *f, char *p, command argumentos)
 {
     struct stat s;
     ssize_t n;
@@ -325,7 +341,38 @@ int LeerFichero(char *f, char *p, command argumentos)
     return 0;
 }
 
-int EscribirFichero(command argumentos)
+int readfileDescriptor(int fd, char *p, command argumentos) {
+    ssize_t n, cont;
+    void *punt;
+    char *trozos[COMMAND_LENGTH];
+
+    // Trocear argumentos
+    trocearCadena(argumentos, trozos);
+    sscanf(p, "0x%p", &punt);
+
+    // Obtener la cantidad de bytes a leer
+    if (trozos[3] == NULL) {
+        printf("Error: falta el parámetro 'cont'.\n");
+        return -1;
+    }
+    cont = atoi(trozos[3]);
+
+    if (cont <= 0) {
+        printf("Error: el número de bytes a leer debe ser mayor que 0.\n");
+        return -1;
+    }
+
+    // Leer del descriptor
+    if ((n = read(fd, punt, cont)) == -1) {
+        perror("Imposible leer del descriptor de fichero");
+        return -1;
+    }
+
+    printf("Leídos %ld bytes desde el descriptor %d en %p\n", n, fd, punt);
+    return 0;
+}
+
+int writefile(command argumentos)
 {
     ssize_t n, cont;
     int df, flags = O_CREAT | O_EXCL | O_WRONLY;
@@ -371,7 +418,37 @@ int EscribirFichero(command argumentos)
     return 0;
 }
 
-void LlenarMemoria(command argumentos)
+int writefileDescriptor(int fd, command argumentos) {
+    ssize_t n, cont;
+    void *punt;
+    char *trozos[COMMAND_LENGTH];
+    int palabras = trocearCadena(argumentos, trozos);
+
+    if (palabras < 3) {
+        printf("Faltan parámetros\n");
+        return -1;
+    }
+
+    // Obtener la dirección y el número de bytes a escribir
+    sscanf(trozos[2], "0x%p", &punt);
+    cont = atoi(trozos[3]);
+
+    if (cont <= 0) {
+        printf("Error: el número de bytes a escribir debe ser mayor que 0.\n");
+        return -1;
+    }
+
+    // Escribir al descriptor
+    if ((n = write(fd, punt, cont)) == -1) {
+        perror("No se pudo escribir en el descriptor");
+        return -1;
+    }
+
+    printf("Escritos %ld bytes en el descriptor %d desde %p\n", n, fd, punt);
+    return 0;
+}
+
+void memFill(command argumentos)
 {
     void *p;
     unsigned char byte;
@@ -421,7 +498,7 @@ void memDump(command argumentos)
     puts("");
 }
 
-void Recursiva(int n)
+void recurse(int n)
 {
     char automatico[TAMANO];
     static char estatico[TAMANO];

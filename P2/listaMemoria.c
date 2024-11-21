@@ -51,33 +51,34 @@ PosM previousM(PosM p, ListM L)
     }
 }
 
-bool insertItemM(ItemM d, ListM *L)
-{
+bool insertItemM(ItemM d, ListM *L) {
     PosM q, r;
 
+    // Reserva memoria para un nuevo nodo
     q = malloc(sizeof(*q));
-
-    if (q == NULL)
+    if (q == NULL) {
+        perror("Error al reservar memoria para el nuevo nodo");
         return false;
+    }
 
+    // Inicializa los datos del nodo
     q->data = d;
     q->next = NULL;
 
-    if (*L == NULL)
-    {
-        // q->data.posicion = 0;
+    // Inserta en la lista
+    if (*L == NULL) {
+        // Si la lista está vacía, el nuevo nodo es el primero
         *L = q;
-    }
-    else
-    {
+    } else {
+        // Si la lista no está vacía, recorre hasta el final
         r = *L;
-        while (r->next != NULL)
+        while (r->next != NULL) {
             r = r->next;
-
-        // q->data.posicion = r->data.posicion + 1;
+        }
         r->next = q;
     }
-    return true;
+
+    return true; // Inserción exitosa
 }
 
 void deleteAtPositionM(PosM p, ListM *L)

@@ -31,12 +31,14 @@ void SharedDelkey(char *args);
 void CmdMmap(char *argument, char *permisos, ListM *L);
 void *MapearFichero(char *fichero, int protection, ListM *L);
 void mmapFree(char *fichero, ListM *L);
-int LeerFichero(char *f, char *p, command argumentos);
-int EscribirFichero(command argumentos);
+int readfile(char *f, char *p, command argumentos);
+int writefile(command argumentos);
+int readfileDescriptor(int fd, char *p, command argumentos);
+int writefileDescriptor(int fd, command argumentos);
 int trocearCadena(command cadenaT, char *trozos[]);
-void LlenarMemoria(command argumentos);
+void memFill(command argumentos);
 void memDump(command argumentos);
-void Recursiva(int n);
+void recurse(int n);
 void memVars();
 void memFuncs();
 

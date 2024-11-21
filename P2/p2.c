@@ -51,6 +51,8 @@ void listfile(command argumentos,bool longg, bool link, bool acc);
 void listdir(command argumentos,bool longg, bool hid, bool link, bool acc);
 void revlist(command comando, bool longg, bool hid, bool link, bool acc);
 void reclist(command comando, bool longg, bool hid, bool link, bool acc);
+void allocate(command comando, bool mallocc, bool shared, bool createshared, bool mmap, ListM *listaMemoria);
+void deallocate(command comando, bool mallocc, bool shared, bool delkey, bool mmap, bool addr, ListM *listaMemoria);
 
 // MAIN
 int main(int argc, char *argv[], char *env[])
@@ -346,36 +348,35 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
 
 // ---- Lab Assigment 2
 
-    else if (!strcmp(argument1, "malloc"))
-    {
-        if (argument2 == NULL)
-            return 29;
-        else if (!strcmp(argument2, "-free"))
-            return 30;
-        else
-            return 28;
-    }
+    else if (!strcmp(argument1, "allocate"))
+        return 30;
 
-    else if (!strcmp(argument1, "mem"))
+    else if (!strcmp(argument1, "deallocate"))
         return 31;
 
-    else if (!strcmp(argument1, "mmap"))
+    else if (!strcmp(argument1, "memfill"))
         return 32;
 
-    else if (!strcmp(argument1, "read"))
+    else if (!strcmp(argument1, "memdump"))
         return 33;
 
-    else if (!strcmp(argument1, "write"))
+    else if (!strcmp(argument1, "memory"))
         return 34;
 
-    else if (!strcmp(argument1, "memfill"))
+    else if (!strcmp(argument1, "readfile"))
         return 35;
 
-    else if (!strcmp(argument1, "memdump"))
+    else if (!strcmp(argument1, "writefile"))
         return 36;
 
-    else if (!strcmp(argument1, "recurse"))
+    else if (!strcmp(argument1, "read"))
         return 37;
+
+    else if (!strcmp(argument1, "write"))
+        return 38;
+
+    else if (!strcmp(argument1, "recurse"))
+        return 39;
 
     else if (argument1 != NULL)
         return 0;
@@ -503,33 +504,34 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         reclist(argumentos,false,false,false,false);
         break;
 
-    case 29:
+    case 29: // revlist
         revlist(argumentos,false,false,false,false);
         break;
 
-    /* case 29: // malloc [size]
-        mallocMemoria(atoi(argument2), listaMemoria);
+     case 30: // allocate [-malloc|-shared|-createshared|-mmap]
+        allocate(argumentos, false, false, false, false, listaMemoria);
         break;
 
-    case 30: // malloc a secas
-        printListM(*listaMemoria, "malloc");
+    case 31: // deallocate [-malloc|-shared|-delkey|-mmap|addr]..
+        deallocate(argumentos, false, false, false, false, false, listaMemoria);
         break;
 
-    case 31: // malloc free
-        if (argument3 == NULL)
-            printListM(*listaMemoria, "malloc");
-        else
-            freeMalloc("malloc", listaMemoria, atoi(argument3));
+    case 32: // memfill
+        memFill(argumentos);
         break;
 
-    case 32: // mem
+    case 33: // memdump
+        memDump(argumentos);
+        break;
+
+    case 34: // memory
         if (argument2 == NULL || !strcmp(argument2, "-all"))
         {
             memVars();
             memFuncs();
             printListM(*listaMemoria, " ");
         }
-        else if (!strcmp(argument2, "-pmap"))
+        else if (!strcmp(argument2, "-pmap"))// en MacOS usa vmmap [pid] en vez de pmap
             Do_MemPmap();
         else if (!strcmp(argument2, "-vars"))
             memVars();
@@ -540,42 +542,36 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
 
         break;
 
-    case 33: // mmap
-        if (argument2 == NULL || (!strcmp(argument2, "-free") && argument3 == NULL))
-            printListM(*listaMemoria, "mmaped");
-        else if (!strcmp(argument2, "-free") && argument3 != NULL)
-            mmapFree(argument3, listaMemoria);
-        else
-            CmdMmap(argument2, argument3, listaMemoria);
-        break;
-
-    case 34: // read
-        if (argument2 == NULL)
+    case 35: // readfile
+        if (argument3 == NULL)
             printf("Faltan parametros");
         else
-            LeerFichero(argument2, argument3, argumentos);
+            readfile(argument2, argument3, argumentos);
         break;
 
-    case 35: // write
-        EscribirFichero(argumentos);
+    case 36: // writefile
+        writefile(argumentos);
         break;
 
-    case 36: // memfill
-        LlenarMemoria(argumentos);
+    case 37: // read
+        if (argument3 == NULL)
+            printf("Faltan parametros");
+        else
+            readfileDescriptor(atoi(argument2), argument3, argumentos);
         break;
 
-    case 37: // memdump
-        memDump(argumentos);
+    case 38: // write
+        writefileDescriptor(atoi(argument2), argumentos);
         break;
 
-    case 38: // recurse
+    case 39: // recurse
         Recursiva(atoi(argument2));
-        break; */
+        break;
 
-    case 0:
+    case 0: // Caso 0
         printf("Invalid command\n");
         break;
-    default:
+    default: // Default
         printf("Invalid command\n");
         break;
     }
@@ -1004,7 +1000,6 @@ void listfile(command comando, bool longg, bool link, bool acc) {
     }
 }
 
-
 void listdir(command comando, bool longg, bool hid, bool link, bool acc) {
     struct stat sb;
     struct dirent *entrada;
@@ -1395,5 +1390,75 @@ void delrec(char *name) // delrec [name1] [name2] ...
         }
         else if (tipo == '-') // caso de que sea un fichero hacemos unlink
             unlink(name);
+    }
+}
+
+void allocate(command comando, bool mallocc, bool shared, bool createshared, bool mmap, ListM *list) {
+    char *path[COMMAND_LENGTH];
+    char comandoCopia[COMMAND_LENGTH]; // Copia para preservar el comando original
+
+    // Hacer una copia del comando original
+    strncpy(comandoCopia, comando, COMMAND_LENGTH);
+    comandoCopia[COMMAND_LENGTH - 1] = '\0'; // Asegurarse de que esté terminada en '\0'
+
+    // Trocear el comando para obtener rutas y opciones
+    trocearCadena(comando, path);
+
+    // Procesar opciones
+    for (int i = 1; path[i] != NULL; i++) {
+        if (!strcmp(path[i], "-malloc")) mallocc = true;
+        else if (!strcmp(path[i], "-shared")) shared = true;
+        else if (!strcmp(path[i], "-createshared")) createshared = true;
+        else if (!strcmp(path[i], "-mmap")) mmap = true;
+    }
+
+    if (mallocc) {
+        mallocMemoria(atoi(path[2]), list);
+    }
+    if (shared) {
+        SharedExistent(comandoCopia, list);
+    }
+    if (createshared) {
+        SharedCreate(comandoCopia, list);
+    }
+    if (mmap) {
+        CmdMmap(path[2], path[3], list);
+    }
+}
+
+void deallocate(command comando, bool mallocc, bool shared, bool delkey, bool mmap, bool addr, ListM *list) {
+    char *path[COMMAND_LENGTH];
+    char comandoCopia[COMMAND_LENGTH]; // Copia para preservar el comando original
+
+    // Hacer una copia del comando original
+    strncpy(comandoCopia, comando, COMMAND_LENGTH);
+    comandoCopia[COMMAND_LENGTH - 1] = '\0'; // Asegurarse de que esté terminada en '\0'
+
+    // Trocear el comando para obtener rutas y opciones
+    trocearCadena(comando, path);
+
+    // Procesar opciones
+    for (int i = 1; path[i] != NULL; i++) {
+        if (!strcmp(path[i], "-malloc")) mallocc = true;
+        else if (!strcmp(path[i], "-shared")) shared = true;
+        else if (!strcmp(path[i], "-delkey")) delkey = true;
+        else if (!strcmp(path[i], "-mmap")) mmap = true;
+        else if (!strcmp(path[i], "-addr")) addr = true;
+    }
+
+    if (mallocc) {
+        freeMalloc("malloc", list, atoi(path[2]));
+    }
+    if (shared) {
+        ShareFree(atoi(path[2]), list);
+    }
+    if (delkey) {
+        SharedDelkey(comandoCopia);
+    }
+    if (mmap) {
+        mmapFree(path[2], list);
+    }
+    if (addr) {
+        
     }
 }
