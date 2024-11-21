@@ -248,10 +248,12 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
 
     else if (strcmp(argument1, "pid") == 0) // pid
     {
-        if (argument2 == NULL)
-            return 12;
-        else if (strcmp(argument2, "-p") == 0 && argument3 == NULL)
-            return 13;
+        return 12;
+    }
+
+    else if (strcmp(argument1, "ppid") == 0) // pid
+    {
+        return 13;
     }
 
     else if (strcmp(argument1, "infosys") == 0 && argument2 == NULL) // infosys
@@ -440,7 +442,7 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         printf("Pid de shell: %d\n", getpid());
         break;
 
-    case 13: // pid -p
+    case 13: // ppid
         printf("Pid del padre del shell: %d\n", getppid());
         break;
 
@@ -565,7 +567,7 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         break;
 
     case 39: // recurse
-        Recursiva(atoi(argument2));
+        recurse(atoi(argument2));
         break;
 
     case 0: // Caso 0

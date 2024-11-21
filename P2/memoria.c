@@ -506,7 +506,7 @@ void recurse(int n)
     printf("parametro:%3d(%p) array %p, arr estatico %p\n", n, &n, automatico, estatico);
 
     if (n > 0)
-        Recursiva(n - 1);
+        recurse(n - 1);
 }
 
 void memVars()
@@ -533,6 +533,6 @@ void memVars()
 
 void memFuncs()
 {
-    printf("%15s\t%15p,%15p,%15p\n", "Funciones programa", *Recursiva, *memVars, *memDump);
+    printf("%15s\t%15p,%15p,%15p\n", "Funciones programa", *recurse, *memVars, *memDump);
     printf("%15s\t%15p,%15p,%15p\n", "Funciones libreria", *strcmp, *malloc, *getpid);
 }
