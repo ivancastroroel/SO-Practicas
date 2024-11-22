@@ -1,7 +1,7 @@
 # Variables
 CC = gcc
 CFLAGS = -Wall -g
-SOURCES = p2.c list.c memoria.c listaMemoria.c listaProcesos.c
+SOURCES = p2.c lista.c memory.c memoryList.c
 OBJECTS = $(SOURCES:.c=.o)
 EXECUTABLE = p2
 

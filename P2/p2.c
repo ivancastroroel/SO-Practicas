@@ -8,36 +8,34 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-// #include <features.h>
 #include <dirent.h>
 #include <pwd.h>
 #include <grp.h>
 #include <limits.h>
-#include "list.h"
-#include "memoria.h"
-#include "listaMemoria.h"
-#include "listaProcesos.h"
+#include "lista.h"
+#include "memory.h"
+#include "memoryList.h"
 
 
 void Bucle(bool finish, char *env[]);
-void printPrompt();
-void leerEntrada(command *comando, List *listaHistorial); // pasamos una string por referencia para guardar sus datos
-void procesarEntrada(command *peticion, List *listaHistorial, List *listaFicheros, ListM *listaMemoria, bool *end, char *env[], ListP *listaProcesos);
-void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *listaMemoria, bool *end, char *argument1, char *argument2, char *argument3, command argumentos, char *env[], ListP *listaProcesos);
-int chooseCommand(char *argument1, char *argument2, char *argument3);
+void writeHeader();
+void leerEntrada(memoryCommand *comando, List *listaHistorial); // pasamos una string por referencia para guardar sus datos
+void procesarEntrada(memoryCommand *peticion, List *listaHistorial, List *listaFicheros, MemoryList *listaMemoria, bool *end, char *env[]);
+void entrada(int argument, List *listaHistorial, List *listaFicheros, MemoryList *listaMemoria, bool *end, char *argument1, char *argument2, char *argument3, memoryCommand argumentos, char *env[]);
+int eligeEntrada(char *argument1, char *argument2, char *argument3);
 void date();
 void dateD();
 void dateT();
 void historic(List listaHistorial);
 void historicN(List listaHistorial, int n);
 bool borraLista(List *L);
-void commandoN(List listaHistorial, List *listaFicheros, ListM *listaMemoria, int n, bool *end, char *env[], ListP *listaProcesos);
+void historic_N(List listaHistorial, List *listaFicheros, MemoryList *listaMemoria, int n, bool *end, char *env[]);
 void infosys();
 void cdDirActual();
 bool cambiarDirectorio(const char *pathname);
 void openFile(char *tr[], List *listaFicheros);
-void listOpen(List listaFicheros);
-void inicializarListaFicheros(List *listaFicheros);
+void openList(List listaFicheros);
+void initListaFicheros(List *listaFicheros);
 bool closeDf(List *listaFicheros, int df);
 void dupDf(List *listaFicheros, int df);
 void help(char *cadena[]);
@@ -47,74 +45,72 @@ void makeDir(char *name);
 void makeFile(char *name);
 void erase(char *name);
 void delrec(char *name);
-void listfile(command argumentos,bool longg, bool link, bool acc);
-void listdir(command argumentos,bool longg, bool hid, bool link, bool acc);
-void revlist(command comando, bool longg, bool hid, bool link, bool acc);
-void reclist(command comando, bool longg, bool hid, bool link, bool acc);
-void allocate(command comando, bool mallocc, bool shared, bool createshared, bool mmap, ListM *listaMemoria);
-void deallocate(command comando, bool mallocc, bool shared, bool delkey, bool mmap, bool addr, ListM *listaMemoria);
+void listfile(memoryCommand argumentos,bool longg, bool link, bool acc);
+void listdir(memoryCommand argumentos,bool longg, bool hid, bool link, bool acc);
+void revlist(memoryCommand comando, bool longg, bool hid, bool link, bool acc);
+void reclist(memoryCommand comando, bool longg, bool hid, bool link, bool acc);
+void allocate(memoryCommand comando, bool mallocc, bool shared, bool createshared, bool mmap, MemoryList *listaMemoria);
+void deallocate(memoryCommand comando, bool mallocc, bool shared, bool delkey, bool mmap, bool addr, MemoryList *listaMemoria);
 
 // MAIN
 int main(int argc, char *argv[], char *env[])
 {
-    bool end = false; // inicializamos la variable para mantener el bucle
+    bool finalizar = false; // inicializamos la variable para mantener el bucle
 
-    Bucle(end, env);
+    Bucle(finalizar, env);
 
     return 0;
 }
 
 // BUCLE PRINCIPAL
-void Bucle(bool finish, char *env[])
+void Bucle(bool terminar, char *entorno[])
 {
-    command entrada;
-    List historial, ficherosAbiertos;
-    ListM listaMemoria;
-    ListP listaProcesos;
+    memoryCommand entradaUsuario;
+    List historialComandos, ficherosAbiertos;
+    MemoryList listaMemoria;
 
-    createEmptyList(&historial);        // crea una lista vacía, es decir == NULL
-    createEmptyList(&ficherosAbiertos); // " & " se usa para obtener la dirección de memoria de la variable, no su valor
-    createEmptyListM(&listaMemoria);
-    createEmptyListP(&listaProcesos);
-    inicializarListaFicheros(&ficherosAbiertos);
+    initializeList(&historialComandos);
+    initializeList(&ficherosAbiertos);
+    initializeMemoryList(&listaMemoria);
+    initListaFicheros(&ficherosAbiertos);
 
-    while (!finish)
+    while (!terminar)
     {
-        printPrompt();
-        leerEntrada(&entrada, &historial);
-        procesarEntrada(&entrada, &historial, &ficherosAbiertos, &listaMemoria, &finish, env, &listaProcesos);
+        writeHeader();
+        leerEntrada(&entradaUsuario, &historialComandos);
+        procesarEntrada(&entradaUsuario, &historialComandos, &ficherosAbiertos, &listaMemoria, &terminar, entorno);
     }
-    free(historial);
+    free(historialComandos);
     free(ficherosAbiertos);
     free(listaMemoria);
 }
 
 // FUNCIONES PARA TRABAJAR CON LOS COMANDOS
 
-void printPrompt()
+void writeHeader()
 {
     printf("-> ");
 }
 
-void leerEntrada(command *comando, List *listaHistorial)
+void leerEntrada(memoryCommand *comando, List *listaHistorial)
 {
-    Item data;
+    ListItem data;
     char *trozos[COMMAND_LENGTH];
 
     fgets(*comando, COMMAND_LENGTH, stdin); // guardamos la entrada del usuario en el string comando, pasado por referencia para guardar su contenido
 
     strcpy(data.name, *comando);
-    insertItem(data, listaHistorial); // inserta el comando en el Historial(Lista)
+    addItemToList(data, listaHistorial); // inserta el comando en el Historial(Lista)
 
     trocearCadena(data.name, trozos);
 
     if (strcmp(trozos[0], "command") == 0)
-        deleteAtPosition(last(*listaHistorial), listaHistorial);
+        removeNodeAtPosition(getLastNode(*listaHistorial), listaHistorial);
 }
 
-void procesarEntrada(command *peticion, List *listaHistorial, List *listaFicheros, ListM *listaMemoria, bool *end, char *env[], ListP *listaProcesos)
+void procesarEntrada(memoryCommand *peticion, List *listaHistorial, List *listaFicheros, MemoryList *listaMemoria, bool *end, char *env[])
 {
-    command temp;
+    memoryCommand temp;
     char *trozo[COMMAND_LENGTH]; // creamos los parámetros donde guardaremos los datos de la petición, y un array de punteros nulos para comparar en la función trocearCadena
     int palabras;
     strcpy(temp, *peticion);
@@ -123,28 +119,28 @@ void procesarEntrada(command *peticion, List *listaHistorial, List *listaFichero
     if (palabras == 0)
         return;
 
-    commands(chooseCommand(trozo[0], trozo[1], trozo[2]), listaHistorial, listaFicheros, listaMemoria, end, trozo[0], trozo[1], trozo[2], temp, env, listaProcesos);
+    entrada(eligeEntrada(trozo[0], trozo[1], trozo[2]), listaHistorial, listaFicheros, listaMemoria, end, trozo[0], trozo[1], trozo[2], temp, env);
 }
 
-void inicializarListaFicheros(List *listaFicheros) // metemos los descriptores de archivos reservados en la lista
+void initListaFicheros(List *listaFicheros) // metemos los descriptores de archivos reservados en la lista
 {
-    Item d;
+    ListItem d;
     d.posicion = 0;
 
     d.fileDescriptor = STDIN_FILENO;
     strcpy(d.name, "entrada estandar");
     d.mode |= fcntl(d.fileDescriptor, F_GETFL); // fcntl nos devuelve el modo de apertura de un fichero (con el flag F_GETFL) dado un descriptor de fichero
-    insertItem(d, listaFicheros);
+    addItemToList(d, listaFicheros);
 
     d.fileDescriptor = STDOUT_FILENO;
     strcpy(d.name, "salida estandar");
     d.mode |= fcntl(d.fileDescriptor, F_GETFL);
-    insertItem(d, listaFicheros);
+    addItemToList(d, listaFicheros);
 
     d.fileDescriptor = STDERR_FILENO;
     strcpy(d.name, "error estandar");
     d.mode |= fcntl(d.fileDescriptor, F_GETFL);
-    insertItem(d, listaFicheros);
+    addItemToList(d, listaFicheros);
 }
 
 char LetraTF(mode_t m)
@@ -204,7 +200,7 @@ char *ConvierteModo2(mode_t m)
     return permisos;
 }
 
-int chooseCommand(char *argument1, char *argument2, char *argument3) // comprobamos que comando hemos pasado
+int eligeEntrada(char *argument1, char *argument2, char *argument3) // comprobamos que comando hemos pasado
 {
     // ---- Lab Assigment 0 ----
     if (argument2 != NULL && (!strcmp(argument2, "-?") || !strcmp(argument2, "-help")) && argument3 == NULL)
@@ -219,15 +215,15 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
             return 3;
     }
 
-    else if (strcmp(argument1, "date") == 0 && argument2 == NULL) // date
+    else if (strcmp(argument1, "date") == 0) // date
     {
         if (argument2 == NULL)
         {
             return 4;
         }
-        else if (strcmp(argument2, "-d") == 0 && argument3 == NULL)
+        else if ((strcmp(argument2, "-d") == 0) && argument3 == NULL)
             return 5;
-        else if (strcmp(argument2, "-t") == 0 && argument3 == NULL)
+        else if ((strcmp(argument2, "-t") == 0) && argument3 == NULL)
             return 6;
     }
 
@@ -237,9 +233,9 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
             return 7;
         else if (strcmp(argument2, "-c") == 0 && argument3 == NULL)
             return 8;
-        else if ((strcmp(argument2, "-N") == 0) && argument3 == NULL)
+        else if (argument2[0] == '-' && argument3 == NULL)
             return 9;
-        else if ((strcmp(argument2, "N") == 0) && argument3 == NULL)
+        else if (argument2[0] != '-' && argument3 == NULL)
             return 10;
     }
 
@@ -386,7 +382,7 @@ int chooseCommand(char *argument1, char *argument2, char *argument3) // comproba
     return 99999;
 }
 
-void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *listaMemoria, bool *end, char *argument1, char *argument2, char *argument3, command argumentos, char *env[], ListP *listaProcesos)
+void entrada(int argument, List *listaHistorial, List *listaFicheros, MemoryList *listaMemoria, bool *end, char *argument1, char *argument2, char *argument3, memoryCommand argumentos, char *env[])
 {
     switch (argument)
     {
@@ -428,14 +424,14 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         break;
 
     case 10: // historic N
-        commandoN(*listaHistorial, listaFicheros, listaMemoria, atoi(argument2), end, env, listaProcesos);
+        historic_N(*listaHistorial, listaFicheros, listaMemoria, atoi(argument2), end, env);
         break;
 
     case 11: //  quit, bye, exit 
         (*end) = true;
         borraLista(listaFicheros);
         borraLista(listaHistorial);
-        borraListaM(listaMemoria);
+        clearMemoryList(listaMemoria);
         break;
 
     case 12: // pid
@@ -459,7 +455,7 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         break;
 
     case 17: // open
-        listOpen(*listaFicheros);
+        openList(*listaFicheros);
         break;
 
     case 18: // open [file] [mode]
@@ -519,28 +515,28 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         break;
 
     case 32: // memfill
-        memFill(argumentos);
+        fillMemory(argumentos);
         break;
 
     case 33: // memdump
-        memDump(argumentos);
+        dumpMemory(argumentos);
         break;
 
     case 34: // memory
         if (argument2 == NULL || !strcmp(argument2, "-all"))
         {
-            memVars();
-            memFuncs();
-            printListM(*listaMemoria, " ");
+            displayMemoryVariables();
+            displayMemoryFunctions();
+            displayMemoryList(*listaMemoria, " ");
         }
         else if (!strcmp(argument2, "-pmap"))// en MacOS usa vmmap [pid] en vez de pmap
-            Do_MemPmap();
+            displayMemoryMap();
         else if (!strcmp(argument2, "-vars"))
-            memVars();
+            displayMemoryVariables();
         else if (!strcmp(argument2, "-funcs"))
-            memFuncs();
+            displayMemoryFunctions();
         else if (!strcmp(argument2, "-blocks"))
-            printListM(*listaMemoria, "all");
+            displayMemoryList(*listaMemoria, "all");
 
         break;
 
@@ -548,26 +544,26 @@ void commands(int argument, List *listaHistorial, List *listaFicheros, ListM *li
         if (argument3 == NULL)
             printf("Faltan parametros");
         else
-            readfile(argument2, argument3, argumentos);
+            readFromFile(argument2, argument3, argumentos);
         break;
 
     case 36: // writefile
-        writefile(argumentos);
+        writeToFile(argumentos);
         break;
 
     case 37: // read
         if (argument3 == NULL)
             printf("Faltan parametros");
         else
-            readfileDescriptor(atoi(argument2), argument3, argumentos);
+            readFromFileDescriptor(atoi(argument2), argument3, argumentos);
         break;
 
     case 38: // write
-        writefileDescriptor(atoi(argument2), argumentos);
+        writeToFileDescriptor(atoi(argument2), argumentos);
         break;
 
     case 39: // recurse
-        recurse(atoi(argument2));
+        recursiveFunction(atoi(argument2));
         break;
 
     case 0: // Caso 0
@@ -610,7 +606,7 @@ void dateT() // date -t
 
 void historic(List listaHistorial) // historic
 {
-    Pos p;
+    NodePosition p;
     int i = 0;
 
     for (p = listaHistorial; (p != NULL); p = p->next) // recorremos el historial y mostramos su contenido
@@ -622,7 +618,7 @@ void historic(List listaHistorial) // historic
 
 void historicN(List listaHistorial, int n) // historic -N
 {
-    Pos p;
+    NodePosition p;
     int i = 0;
     p = listaHistorial;
 
@@ -634,19 +630,19 @@ void historicN(List listaHistorial, int n) // historic -N
     }
 }
 
-void commandoN(List listaHistorial, List *listaFicheros, ListM *listaMemoria, int n, bool *end, char *env[], ListP *listaProcesos) // historic N
+void historic_N(List listaHistorial, List *listaFicheros, MemoryList *listaMemoria, int n, bool *end, char *env[]) // historic N
 {
-    Pos p;
-    command temp, aux;
+    NodePosition p;
+    memoryCommand temp, aux;
     char *trozo[COMMAND_LENGTH];
 
-    if (isEmptyList(listaHistorial))
+    if (isListEmpty(listaHistorial))
     {
         printf("El historial está vacío\n");
         return;
     }
 
-    p = findPosition(n, listaHistorial); // conseguimos el elemento de la listaHistorial de la posición que nos interesa
+    p = findNodeByPosition(n, listaHistorial); // conseguimos el elemento de la listaHistorial de la posición que nos interesa
 
     if (p == NULL || p->data.posicion != n) // si n es una posición que no existe en la listaHistorial entonces acaba
     {
@@ -660,12 +656,12 @@ void commandoN(List listaHistorial, List *listaFicheros, ListM *listaMemoria, in
     strcpy(aux, p->data.name); // copiamos en temp el nombre del comando para no desconfigurar la listaHistorial
 
     trocearCadena(temp, trozo); // troceamos la cadena y obtenemos en el array de punteros trozo el comando separado
-    commands(chooseCommand(trozo[0], trozo[1], trozo[2]), &listaHistorial, listaFicheros, listaMemoria, end, trozo[0], trozo[1], trozo[2], aux, env, listaProcesos);
+    entrada(eligeEntrada(trozo[0], trozo[1], trozo[2]), &listaHistorial, listaFicheros, listaMemoria, end, trozo[0], trozo[1], trozo[2], aux, env);
 }
 
 bool borraLista(List *L) // historic -c
 {
-    Pos p, temp;
+    NodePosition p, temp;
     p = *L;
 
     if (*L == NULL)
@@ -677,7 +673,7 @@ bool borraLista(List *L) // historic -c
         p = p->next; // p pasa al siguiente elemento para que cuando liberemos el espacio no nos quedemos fuera de la listaHistorial
         free(temp);  // liberamos el espacio
     }
-    createEmptyList(L); // inicializamos de vuelta la listaHistorial
+    initializeList(L); // inicializamos de vuelta la listaHistorial
     return true;
 }
 
@@ -708,9 +704,9 @@ bool cambiarDirectorio(const char *pathname) // cd [dir]
         return true;
 }
 
-void listOpen(List listaFicheros) // open
+void openList(List listaFicheros) // open
 {
-    Pos p;
+    NodePosition p;
     char modo[COMMAND_LENGTH] = ""; // inicializamos modo
 
     if (listaFicheros == NULL)
@@ -743,7 +739,7 @@ void openFile(char *trozo[], List *listaFicheros) // open file m1 m2...
 {
     int df, mode = 0;
     char *tr[COMMAND_LENGTH];
-    Item fichero;
+    ListItem fichero;
 
     trocearCadena(*trozo, tr); // troceamos el comando y lo guardamos en tr[]
 
@@ -776,7 +772,7 @@ void openFile(char *trozo[], List *listaFicheros) // open file m1 m2...
         strcpy(fichero.name, tr[1]);
         fichero.mode = mode;
 
-        insertItem(fichero, listaFicheros);
+        addItemToList(fichero, listaFicheros);
 
         printf("Anadida entrada %d a la lista de ficheros abiertos\n", df); // dado que df también nos sirve como referencia a la posición de la lista, lo utilizamos en el printf
     }
@@ -784,9 +780,9 @@ void openFile(char *trozo[], List *listaFicheros) // open file m1 m2...
 
 bool closeDf(List *listaFicheros, int df) // close [df]
 {
-    Pos p;
+    NodePosition p;
 
-    p = findFileDescriptor(df, *listaFicheros);
+    p = findNodeByDescriptor(df, *listaFicheros);
 
     if (close(p->data.fileDescriptor) == (-1)) // close devuelve -1 si da error, y 0 si es exitoso, findFileDescriptor nos devuelve el descriptor de fichero de la posición que buscamos
     {
@@ -796,26 +792,26 @@ bool closeDf(List *listaFicheros, int df) // close [df]
     }
     else // si no da error, entonces eliminamos el fichero de la lista de ficheros abiertos
     {
-        deleteAtPosition(p, listaFicheros);
+        removeNodeAtPosition(p, listaFicheros);
         return true;
     }
 }
 
 void dupDf(List *listaFicheros, int df) // dup [df]
 {
-    Pos p;
-    Item ficheroDup;
+    NodePosition p;
+    ListItem ficheroDup;
     char temp[1000];
 
     ficheroDup.fileDescriptor = dup(df);
-    p = findFileDescriptor(df, *listaFicheros);
+    p = findNodeByDescriptor(df, *listaFicheros);
     ficheroDup.mode = p->data.mode;
 
     strcpy(temp, p->data.name); // copiamos el string en otro de mayor tamaño para que sprintf pueda hacer la operación con suficiente espacio
     sprintf(ficheroDup.name, "dup %d (%s)", df, temp);
 
     if (ficheroDup.fileDescriptor != (-1))
-        insertItem(ficheroDup, listaFicheros);
+        addItemToList(ficheroDup, listaFicheros);
     else
         perror("Imposible duplicar fichero");
 }
@@ -828,22 +824,18 @@ void help(char *cadena[])
         printf("authors [-n|-l] Muestra los nombres y/o logins de los autores\n");
 
     else if (strcmp(*cadena, "pid") == 0)
-        printf("pid [-p]\t\tMuestra el pid del shell o de su proceso padre\n");
+        printf("pid [-p]\t\tMuestra el pid del shell\n");
+    else if (strcmp(*cadena, "ppid") == 0)
+        printf("ppid [-p]\t\tMuestra el pid del proceso padre del shell\n");
 
-    else if (strcmp(*cadena, "chdir") == 0)
-        printf("chdir [dir]\t\tCambia (o muestra) el directorio actual del shell\n");
+    else if (strcmp(*cadena, "cd") == 0)
+        printf("cd [dir]\t\tCambia (o muestra) el directorio actual del shell\n");
 
     else if (strcmp(*cadena, "date") == 0)
-        printf("date\t\tMuestra la fecha actual\n");
+        printf("date [-d|-t]\t\tMuestra la fecha y/o la hora actual\n");
 
-    else if (strcmp(*cadena, "time") == 0)
-        printf("time\t\tMuestra la hora actual\n");
-
-    else if (strcmp(*cadena, "hist") == 0)
-        printf("hist [-c|-N]\t\tMuestra (o borra) el historico de comandos\n\t\t-N: muestra los N primeros\n\t\t-c: borra el historico\n");
-
-    else if (strcmp(*cadena, "command") == 0)
-        printf("command [-N]\t\tRepite el comando N (del historico)\n");
+    else if (strcmp(*cadena, "historic") == 0)
+        printf("historic [-c|-N]\t\tMuestra (o borra) el historico de comandos\n\t\t-N: muestra los N primeros\n\t\t-c: borra el historico\n\t\tN: repite el comando N");
 
     else if (strcmp(*cadena, "open") == 0)
         printf("open fich m1 m2...\t\tAbre el fichero fich. y lo anade a la lista de ficherosabiertos del shell\n\t\tm1, m2..es el modo de apertura (or bit a bit de los siguientes).\n\t\tcr: O_CREAT\t\tap: O_APPEND\n\t\tex:O_EXCL\t\tro:O_RDONLY\n\t\trw: O_RDWR\t\two: O_WRONLY\n\t\ttr: O_TRUNC\n");
@@ -853,9 +845,6 @@ void help(char *cadena[])
 
     else if (strcmp(*cadena, "dup") == 0)
         printf("dup df\tDuplica el descriptor de fichero df y anade una nueva entrada a la lista ficheros abiertos\n");
-
-    else if (strcmp(*cadena, "listopen") == 0)
-        printf("listopen [n]\tLista los ficheros abiertos (al menos n) del shell\n");
 
     else if (strcmp(*cadena, "infosys") == 0)
         printf("infosys\t\tMuestra informacion de la maquina donde corre el shell\n");
@@ -871,36 +860,51 @@ void help(char *cadena[])
 
     else if (strcmp(*cadena, "bye") == 0)
         printf("bye\tTermina la ejecucion del shell\n");
+    
+    else if (strcmp(*cadena, "cwd") == 0)
+        printf("cwd\tMuestra e directorio actual del shell\n");
 
     else if (strcmp(*cadena, "listfile") == 0)
-        printf("stat\t[-long][-link][-acc] name1 name2..\t\tlista ficheros;\n\t\t-long: listado largo\n\t\t-acc: acesstime\n\t\t-link: si es enlace simbolico, el path contenido\n");
+        printf("listfile\t[-long][-link][-acc] name1 name2..\t\tlista ficheros;\n\t\t-long: listado largo\n\t\t-acc: acesstime\n\t\t-link: si es enlace simbolico, el path contenido\n");
 
     else if (strcmp(*cadena, "listdir") == 0)
-        printf("listdir [-reca] [-recb] [-hid][-long][-link][-acc] n1 n2 ..	lista contenidos de directorios\n\t\t-hid:incluye los ficheros ocultos\n\t\t-recb:recursivo (antes)\n\t\t-reca: recursivo (despues)\n\t\tresto parametros como stat\n");
+        printf("listdir [-hid][-long][-link][-acc] n1 n2 ..	lista contenidos de directorios\n\t\t-hid:incluye los ficheros ocultos\n");
 
     else if (strcmp(*cadena, "makefile") == 0)
-        printf("makefile [-f] [name]	Crea un directorio o un fichero (-f)\n");
+        printf("makefile [name]	Crea un fichero de nombre name\n");
+    
+    else if (strcmp(*cadena, "makedir") == 0)
+        printf("makedir [name]	Crea un directorio de nombre name\n");
 
     else if (strcmp(*cadena, "delrec") == 0)
         printf("delrec [name1 name2 ..]	Borra ficheros o directorios no vacios recursivamente\n");
 
     else if (strcmp(*cadena, "erase") == 0)
-        printf("delete [name1 name2 ..]	Borra ficheros o directorios vacios\n");
+        printf("erase [name1 name2 ..]	Borra ficheros o directorios vacios\n");
+    
+    else if (strcmp(*cadena, "reclist") == 0)
+        printf("reclist [-hid][-long][-link][-acc] n1 n2 ..\t\t lista recursivamente contenidos de directorios (subdirs despues)\n\t\t -hid: incluye los ficheros ocultos\n\t\t-long: listado largo\n\t\t -acc: accesstime\n\t\t-link: si es enlace simbolico, el path contenido\n");
+    
+    else if (strcmp(*cadena, "revlist") == 0)
+        printf("revlist [-hid][-long][-link][-acc] n1 n2 ..\t\t lista recursivamente contenidos de directorios (subdirs antes)\n\t\t -hid: incluye los ficheros ocultos\n\t\t-long: listado largo\n\t\t -acc: accesstime\n\t\t-link: si es enlace simbolico, el path contenido\n");
 
-    else if (strcmp(*cadena, "malloc") == 0)
-        printf("malloc [-free] [tam]	asigna un bloque memoria de tamano tam con malloc\n\t-free: desasigna un bloque de memoria de tamano tam asignado con malloc\n");
+    else if (strcmp(*cadena, "allocate") == 0)
+        printf("allocate [-malloc|-shared|-createshared|-mmap]...	Asigna un bloque memoria\n\t-malloc tam: asigna un bloque malloc de tamano tam\n\t-createshared cl tam: asigna (creando) el bloque de memoria compartida de clave cl y tamano tam\n\t-shared cl: asigna el bloque de memoria compartida (ya existente) de clave cl\n\t-mmap fich perm: mapea el fichero fich, perm son los permisos\n");
+    
+    else if (strcmp(*cadena, "deallocate") == 0)
+        printf("deallocate [-malloc|-shared|-delkey|-mmap|addr]...	Desasigna un bloque memoria\n\t\t-malloc tam: asigna un bloque malloc de tamano tam\n\t\t-shared cl: desasigna (desmapea) el bloque de memoria compartida de clave cl\n\t\t-delkey cl: elimina del sistema (sin desmapear) la clave de memoria cl\n\t\t-mmap fich: desmapea el fichero mapeado fich\n\taddr: desasigna el bloque de memoria en la direccion addr\n");
 
-    else if (strcmp(*cadena, "shared") == 0)
-        printf("shared [-free|-create|-delkey] cl [tam]	asigna memoria compartida con clave cl en el programa\n\t-create cl tam: asigna (creando) el bloque de memoria compartida de clave cl y tamano tam\n\t-free cl: desmapea el bloque de memoria compartida de clave cl\n\t-delkey clelimina del sistema (sin desmapear) la clave de memoria cl\n");
-
-    else if (strcmp(*cadena, "mmap") == 0)
-        printf("mmap [-free] fich prm	mapea el fichero fich con permisos prm\n\t-free fich: desmapea el ficherofich\n");
+    else if (strcmp(*cadena, "readfile") == 0)
+        printf("read fiche addr cont 	Lee cont bytes desde fich a la direccion addr\n");
+    
+    else if (strcmp(*cadena, "writefile") == 0)
+        printf("writefile [-o] fiche addr cont 	  Escribe cont bytes desde la direccion addr a fich (-o sobreescribe)\n");
 
     else if (strcmp(*cadena, "read") == 0)
-        printf("read fiche addr cont 	Lee cont bytes desde fich a la direccion addr\n");
+        printf("read fiche addr cont 	Lee cont bytes desde fich a la direccion addr using a already opened file descriptor\n");
 
     else if (strcmp(*cadena, "write") == 0)
-        printf("write [-o] fiche addr cont 	  Escribe cont bytes desde la direccion addr a fich (-o sobreescribe)\n");
+        printf("write [-o] fiche addr cont 	  Escribe cont bytes desde la direccion addr a fich (-o sobreescribe) using a already opened file descriptor\n");
 
     else if (strcmp(*cadena, "memdump") == 0)
         printf("memdump addr cont 	  Vuelca en pantallas los contenidos (cont bytes) de la posicion de memoria addr\n");
@@ -908,11 +912,11 @@ void help(char *cadena[])
     else if (strcmp(*cadena, "memfill") == 0)
         printf("memfill addr cont byte 	  Llena la memoria a partir de addr con byte\n");
 
-    else if (strcmp(*cadena, "mem") == 0)
-        printf("mem [-blocks|-funcs|-vars|-all|-pmap] ..	Muestra muestra detalles de la memoria del proceso\n\t\t-blocks: los bloques de memoria asignados\n\t\t-funcs: las direcciones de las funciones\n\t\t-vars: las direcciones de las variables\n\t\t-all: todo\n\t\t-pmap: muestra la salida del comando pmap(o similar)\n");
+    else if (strcmp(*cadena, "memory") == 0)
+        printf("memory [-blocks|-funcs|-vars|-all|-pmap] ..	Muestra muestra detalles de la memoria del proceso\n\t\t-blocks: los bloques de memoria asignados\n\t\t-funcs: las direcciones de las funciones\n\t\t-vars: las direcciones de las variables\n\t\t-all: todo\n\t\t-pmap: muestra la salida del comando pmap(o similar)\n");
 
     else if (strcmp(*cadena, "recurse") == 0)
-        printf("recurse [n]	     Invoca a la funcion recursiva n veces\n");
+        printf("recurse [n]\tInvoca a la funcion recursiva n veces\n");
 
     else
         printf("%s no encontrado\n", *cadena);
@@ -940,7 +944,7 @@ void makeDir(char *name) //makedir [name]
         perror("Imposible crear directorio");
 }
 
-void listfile(command comando, bool longg, bool link, bool acc) {
+void listfile(memoryCommand comando, bool longg, bool link, bool acc) {
     struct stat sb;
     char permisos[COMMAND_LENGTH];
     char *path[COMMAND_LENGTH];
@@ -1002,7 +1006,7 @@ void listfile(command comando, bool longg, bool link, bool acc) {
     }
 }
 
-void listdir(command comando, bool longg, bool hid, bool link, bool acc) {
+void listdir(memoryCommand comando, bool longg, bool hid, bool link, bool acc) {
     struct stat sb;
     struct dirent *entrada;
     DIR *directorio;
@@ -1092,7 +1096,7 @@ void listdir(command comando, bool longg, bool hid, bool link, bool acc) {
     }
 }
 
-void reclist(command comando, bool longg, bool hid, bool link, bool acc) {
+void reclist(memoryCommand comando, bool longg, bool hid, bool link, bool acc) {
     struct stat sb;
     struct dirent *entrada;
     DIR *directorio;
@@ -1203,7 +1207,7 @@ void reclist(command comando, bool longg, bool hid, bool link, bool acc) {
     }
 }
 
-void revlist(command comando, bool longg, bool hid, bool link, bool acc) {
+void revlist(memoryCommand comando, bool longg, bool hid, bool link, bool acc) {
     struct stat sb;
     struct dirent *entrada;
     DIR *directorio;
@@ -1313,7 +1317,6 @@ void revlist(command comando, bool longg, bool hid, bool link, bool acc) {
     }
 }
 
-
 void erase(char *name) // erase [name1] [name2] ...
 {
     struct stat sb;
@@ -1395,7 +1398,7 @@ void delrec(char *name) // delrec [name1] [name2] ...
     }
 }
 
-void allocate(command comando, bool mallocc, bool shared, bool createshared, bool mmap, ListM *list) {
+void allocate(memoryCommand comando, bool mallocc, bool shared, bool createshared, bool mmap, MemoryList *list) {
     char *path[COMMAND_LENGTH];
     char comandoCopia[COMMAND_LENGTH]; // Copia para preservar el comando original
 
@@ -1415,20 +1418,20 @@ void allocate(command comando, bool mallocc, bool shared, bool createshared, boo
     }
 
     if (mallocc) {
-        mallocMemoria(atoi(path[2]), list);
+        allocateMemory(atoi(path[2]), list);
     }
     if (shared) {
-        SharedExistent(comandoCopia, list);
+        accessExistingSharedMemory(comandoCopia, list);
     }
     if (createshared) {
-        SharedCreate(comandoCopia, list);
+        createSharedMemory(comandoCopia, list);
     }
     if (mmap) {
-        CmdMmap(path[2], path[3], list);
+        mapFileMemory(path[2], path[3], list);
     }
 }
 
-void deallocate(command comando, bool mallocc, bool shared, bool delkey, bool mmap, bool addr, ListM *list) {
+void deallocate(memoryCommand comando, bool mallocc, bool shared, bool delkey, bool mmap, bool addr, MemoryList *list) {
     char *path[COMMAND_LENGTH];
     char comandoCopia[COMMAND_LENGTH]; // Copia para preservar el comando original
 
@@ -1449,16 +1452,16 @@ void deallocate(command comando, bool mallocc, bool shared, bool delkey, bool mm
     }
 
     if (mallocc) {
-        freeMalloc("malloc", list, atoi(path[2]));
+        deallocateMemory("malloc", list, atoi(path[2]));
     }
     if (shared) {
-        ShareFree(atoi(path[2]), list);
+        freeSharedMemory(atoi(path[2]), list);
     }
     if (delkey) {
-        SharedDelkey(comandoCopia);
+        deleteSharedMemoryKey(comandoCopia);
     }
     if (mmap) {
-        mmapFree(path[2], list);
+        releaseMappedFile(path[2], list);
     }
     if (addr) {
         
